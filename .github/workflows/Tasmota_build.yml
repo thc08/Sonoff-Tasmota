@@ -9,12 +9,12 @@ permissions:
   contents: read
 
 concurrency:
-  group: tasmota-build-\${{ github.ref }}
+  group: tasmota-build-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   build:
-    name: Build \${{ matrix.environment }}
+    name: Build ${{ matrix.environment }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -38,12 +38,12 @@ jobs:
           python -m pip install platformio
 
       - name: Build firmware
-        run: pio run -e \${{ matrix.environment }}
+        run: pio run -e ${{ matrix.environment }}
 
       - name: Upload firmware artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: \${{ matrix.environment }}
+          name: ${{ matrix.environment }}
           path: build_output/firmware/**
           if-no-files-found: error
           retention-days: 14
