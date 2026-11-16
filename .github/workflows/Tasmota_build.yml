@@ -54,13 +54,13 @@ jobs:
 
           config = json.loads(Path("/tmp/pio-project-config.json").read_text())
           rendered = json.dumps(config, sort_keys=True)
-          required = ("-DUSE_CONFIG_OVERRIDE", "-DFIRMWARE_TASMOTA32", "-DOTTELLO_POW_SLIM", "tasmota32-ottelo-pow-slim.bin")
+          required = ("-DUSE_CONFIG_OVERRIDE", "-DFIRMWARE_TASMOTA32", "-DOTTELLO_POW_SLIM", "tasmota32-ottelo-pow-slim.bin", "esp32_partition_app1856k_fs1344k.csv", "CONFIG_BT_DISABLED=y", "CONFIG_BT_NIMBLE_DISABLED=y", "CONFIG_BT_CONTROLLER_DISABLED=y")
           missing = [flag for flag in required if flag not in rendered]
           if missing:
               raise SystemExit("Resolved PlatformIO configuration is missing: " + ", ".join(missing))
           if "\\\\${env:tasmota32_base.build_flags}" in rendered or "\\${env:tasmota32_base.build_flags}" in rendered:
               raise SystemExit("PlatformIO left the base build_flags interpolation unresolved")
-          print("Resolved PlatformIO config contains the ESP32 firmware target, POW Slim profile and OTA URL.")
+          print("Resolved PlatformIO config contains the ESP32 target, POW Slim profile, OTA URL, TinyC 4 MB partition layout and disabled Bluetooth/NimBLE.")
           PY
 
       - name: Verify resolved full Otello TC no-SML configuration
