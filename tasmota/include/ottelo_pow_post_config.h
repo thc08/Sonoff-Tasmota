@@ -112,6 +112,17 @@
 #undef USE_IR_SEND_RC5
 #undef USE_IR_SEND_RC6
 #undef USE_IR_RECEIVE
+#undef USE_IR_REMOTE_FULL
+#undef USE_DHT12
+#undef USE_MAX31855
+#undef USE_MAX31865
+
+// No SPI expansion or LoRaWAN bridge is fitted.
+#undef USE_MCP23XXX_DRV
+#undef USE_SPI_LORA
+#undef USE_LORA_SX126X
+#undef USE_LORA_SX127X
+#undef USE_LORAWAN_BRIDGE
 
 // Keep only the CSE7766 energy monitor.
 #undef USE_SML_M
@@ -162,7 +173,7 @@
 #if defined(USE_BERRY) || defined(USE_AUTOCONF) || defined(USE_EXTENSION_MANAGER) || defined(USE_SCRIPT) || defined(USE_RULES) || defined(USE_WEBCLIENT_HTTPS)
   #error "POW Slim: excluded scripting, extension or outbound HTTPS subsystem is still enabled"
 #endif
-#if defined(USE_AC_ZERO_CROSS_DIMMER) || defined(USE_COUNTER) || defined(USE_KNX) || defined(USE_KNX_WEB_MENU) || defined(USE_TUYA_MCU) || defined(USE_TUYA_TIME) || defined(USE_SHUTTER) || defined(USE_IR_REMOTE) || defined(USE_DHT) || defined(USE_SERIAL_BRIDGE) || defined(USE_DEEPSLEEP) || defined(USE_IMPROV) || defined(USE_SONOFF_RF) || defined(USE_RF_FLASH) || defined(USE_SONOFF_SC) || defined(USE_ARMTRONIX_DIMMERS) || defined(USE_PS_16_DZ) || defined(USE_SONOFF_IFAN) || defined(USE_BUZZER) || defined(USE_ARILUX_RF) || defined(USE_EXS_DIMMER) || defined(USE_DEVICE_GROUPS) || defined(USE_PWM_DIMMER) || defined(USE_SONOFF_D1) || defined(USE_SHELLY_DIMMER) || defined(USE_LIGHT) || defined(USE_WS2812) || defined(USE_HLW8012) || defined(USE_BL09XX) || defined(USE_CSE7761) || defined(USE_UNISHOX_COMPRESSION) || defined(USE_SENDMAIL) || defined(USE_TELEGRAM)
+#if defined(USE_AC_ZERO_CROSS_DIMMER) || defined(USE_COUNTER) || defined(USE_KNX) || defined(USE_KNX_WEB_MENU) || defined(USE_TUYA_MCU) || defined(USE_TUYA_TIME) || defined(USE_SHUTTER) || defined(USE_IR_REMOTE) || defined(USE_DHT) || defined(USE_DHT12) || defined(USE_MAX31855) || defined(USE_MAX31865) || defined(USE_SERIAL_BRIDGE) || defined(USE_DEEPSLEEP) || defined(USE_IMPROV) || defined(USE_SPI_LORA) || defined(USE_LORA_SX126X) || defined(USE_LORA_SX127X) || defined(USE_LORAWAN_BRIDGE) || defined(USE_TUYAMCUBR) || defined(USE_SONOFF_RF) || defined(USE_RF_FLASH) || defined(USE_SONOFF_SC) || defined(USE_ARMTRONIX_DIMMERS) || defined(USE_PS_16_DZ) || defined(USE_SONOFF_IFAN) || defined(USE_BUZZER) || defined(USE_ARILUX_RF) || defined(USE_EXS_DIMMER) || defined(USE_DEVICE_GROUPS) || defined(USE_PWM_DIMMER) || defined(USE_SONOFF_D1) || defined(USE_SHELLY_DIMMER) || defined(USE_LIGHT) || defined(USE_WS2812) || defined(USE_HLW8012) || defined(USE_BL09XX) || defined(USE_CSE7761) || defined(USE_UNISHOX_COMPRESSION) || defined(USE_SENDMAIL) || defined(USE_TELEGRAM)
   #error "POW Slim: an unrelated Tasmota driver is still enabled"
 #endif
 
