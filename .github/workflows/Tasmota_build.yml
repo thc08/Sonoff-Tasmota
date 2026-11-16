@@ -65,6 +65,26 @@ jobs:
       - name: Build firmware
         run: pio run -e ${{ matrix.environment }}
 
+      - name: Collect POW Slim linker diagnostics
+        if: matrix.environment == 'tasmota32-ottelo-pow-slim'
+        run: |
+          test -s .pio/build/tasmota32-ottelo-pow-slim/firmware.elf
+          test -s .pio/build/tasmota32-ottelo-pow-slim/firmware.map
+          test -s tasmota/tasmota_defines_for_berry.h
+          mkdir -p build_output/pow-slim-debug
+          cp .pio/build/tasmota32-ottelo-pow-slim/firmware.elf build_output/pow-slim-debug/
+          cp .pio/build/tasmota32-ottelo-pow-slim/firmware.map build_output/pow-slim-debug/
+          cp tasmota/tasmota_defines_for_berry.h build_output/pow-slim-debug/
+
+      - name: Upload POW Slim debug diagnostics
+        if: matrix.environment == 'tasmota32-ottelo-pow-slim'
+        uses: actions/upload-artifact@v4
+        with:
+          name: pow-slim-debug
+          path: build_output/pow-slim-debug/**
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Upload firmware artifacts
         uses: actions/upload-artifact@v4
         with:
