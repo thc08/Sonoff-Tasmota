@@ -134,6 +134,7 @@
 
 // SML and its TinyC command hooks are the only Otello features deliberately omitted.
 #undef USE_SML_M
+#undef USE_SML
 #undef USE_SML_SCRIPT_CMD
 #undef USE_SML_CRC
 #undef USE_SML_AUTHKEY
@@ -171,8 +172,10 @@
 #undef USE_RULES
 #define USE_TINYC
 #define USE_TINYC_IDE
-#define TINYC_DEFAULT_REPO "https://raw.githubusercontent.com/ottelo9/tasmota-sml-script/main/tinyc/bytecode"
-#define TINYC_DEFAULT_IDE_URL "https://raw.githubusercontent.com/ottelo9/tasmota-sml-script/main/tinyc/tinyc_ide.html.gz"
+// Use the general TinyC repository/IDE in this no-SML variant; do not
+// point a freshly flashed device at the SmartMeter/SML program collection.
+#define TINYC_DEFAULT_REPO "https://raw.githubusercontent.com/gemu2015/Sonoff-Tasmota/universal/tasmota/tinyc/bytecode"
+#define TINYC_DEFAULT_IDE_URL "https://raw.githubusercontent.com/gemu2015/Sonoff-Tasmota/universal/tasmota/tinyc/tinyc_ide.html.gz"
 #define TINYC_REPO_LIST \
   "TinyC Examples (gemu2015)|https://raw.githubusercontent.com/gemu2015/Sonoff-Tasmota/universal/tasmota/tinyc"
 
