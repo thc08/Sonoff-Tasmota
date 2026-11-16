@@ -52,8 +52,8 @@
 #undef USE_BERRY
 #undef USE_AUTOCONF
 #undef USE_EXTENSION_MANAGER
-// TinyC IDE uses the device web server; no outbound HTTPS client is needed.
-#undef USE_WEBCLIENT_HTTPS
+// Keep USE_WEBCLIENT_HTTPS: TinyC's raw TLS syscalls and Tasmota's
+// BearSSL declarations are compiled as part of the TinyC driver.
 #undef USE_SCRIPT
 #undef USE_RULES
 
