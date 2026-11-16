@@ -1515,6 +1515,28 @@
 #endif
 
 /*********************************************************************************************\
+ * Validate the dedicated Otello POW Slim configuration after all post-processing
+\*********************************************************************************************/
+
+#if defined(OTTELLO_POW_SLIM)
+  #ifndef USE_CONFIG_OVERRIDE
+    #error "POW Slim: USE_CONFIG_OVERRIDE was not passed to the compiler"
+  #endif
+  #if !defined(USE_TINYC) || !defined(USE_TINYC_IDE) || !defined(USE_UFILESYS)
+    #error "POW Slim: required TinyC/IDE/filesystem features are missing"
+  #endif
+  #if !defined(USE_ENERGY_SENSOR) || !defined(USE_CSE7766) || !defined(USE_DISPLAY_TM1621_SONOFF)
+    #error "POW Slim: required CSE7766 energy monitor or TM1621 display is missing"
+  #endif
+  #if defined(USE_BERRY) || defined(USE_AUTOCONF) || defined(USE_EXTENSION_MANAGER) || defined(USE_SCRIPT) || defined(USE_RULES)
+    #error "POW Slim: an excluded scripting or extension subsystem is still enabled"
+  #endif
+  #if defined(USE_WEBCLIENT_HTTPS) || defined(USE_TLS)
+    #error "POW Slim: HTTPS/TLS is still enabled and consumes unnecessary resources"
+  #endif
+#endif // OTTELLO_POW_SLIM
+
+/*********************************************************************************************\
  * Post-process stack size adjustment
 \*********************************************************************************************/
 

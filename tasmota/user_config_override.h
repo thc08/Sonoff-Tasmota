@@ -52,6 +52,8 @@
 #undef USE_BERRY
 #undef USE_AUTOCONF
 #undef USE_EXTENSION_MANAGER
+// TinyC IDE uses the device web server; no outbound HTTPS client is needed.
+#undef USE_WEBCLIENT_HTTPS
 #undef USE_SCRIPT
 #undef USE_RULES
 

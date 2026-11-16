@@ -37,6 +37,25 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install pioarduino==6.2.0
 
+      - name: Verify resolved POW Slim build configuration
+        if: matrix.environment == 'tasmota32-ottelo-pow-slim'
+        run: |
+          pio project config --json-output > /tmp/pio-project-config.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          config = json.loads(Path("/tmp/pio-project-config.json").read_text())
+          rendered = json.dumps(config, sort_keys=True)
+          required = ("-DUSE_CONFIG_OVERRIDE", "-DOTTELLO_POW_SLIM")
+          missing = [flag for flag in required if flag not in rendered]
+          if missing:
+              raise SystemExit("Resolved PlatformIO configuration is missing: " + ", ".join(missing))
+          if "\\\\${env:tasmota32_base.build_flags}" in rendered or "\\${env:tasmota32_base.build_flags}" in rendered:
+              raise SystemExit("PlatformIO left the base build_flags interpolation unresolved")
+          print("Resolved PlatformIO config contains both required POW Slim build flags.")
+          PY
+
       - name: Build firmware
         run: pio run -e ${{ matrix.environment }}
 
