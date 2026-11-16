@@ -70,6 +70,12 @@ String EthernetMacAddress(void);
 
 #include "include/tasmota_configurations.h"            // Preconfigured configurations
 
+// Apply the device-specific Slim profile after Tasmota's ESP32 defaults have
+// been loaded; otherwise those defaults re-enable drivers removed earlier.
+#ifdef OTTELLO_POW_SLIM
+  #include "ottelo_pow_post_config.h"
+#endif
+
 /*********************************************************************************************\
  * Final overrides
 \*********************************************************************************************/
