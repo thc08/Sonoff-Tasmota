@@ -59,9 +59,11 @@
 #undef USE_SCRIPT
 #undef USE_RULES
 
-// No Tasmota I2C/SPI peripherals are connected; TM1621 uses GPIO lines.
+// No Tasmota I2C peripherals are connected. TinyC's native SPI API uses
+// the framework SPI class, so include it before tasmota.ino checks USE_SPI;
+// the post-config override removes all external SPI devices and SD-card support.
 #undef USE_I2C
-#undef USE_SPI
+#define USE_SPI
 
 // Remove unrelated default Tasmota drivers and automation. This target is a
 // POW Elite (relay + CSE7766 + TM1621), not a general-purpose dimmer/controller.
