@@ -52,9 +52,10 @@
 #undef USE_BERRY
 #undef USE_AUTOCONF
 #undef USE_EXTENSION_MANAGER
-// Disable Tasmota's outbound HTTPS webclient. TinyC's raw TLS syscalls
-// use BearSSL directly and remain available without USE_WEBCLIENT_HTTPS.
+// Disable Tasmota's outbound HTTPS webclient, but keep BearSSL itself for
+// TinyC raw TLS syscalls (tlsConnect/tlsWrite/tlsRead and certificate helpers).
 #undef USE_WEBCLIENT_HTTPS
+#define USE_TLS
 #undef USE_SCRIPT
 #undef USE_RULES
 
