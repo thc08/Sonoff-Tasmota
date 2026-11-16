@@ -35,7 +35,7 @@ jobs:
       - name: Install PlatformIO
         run: |
           python -m pip install --upgrade pip
-          python -m pip install pioarduino==6.2.0
+          python -m pip install platformio==6.2.0
 
       - name: Verify resolved POW Slim build configuration
         if: matrix.environment == 'tasmota32-ottelo-pow-slim'
