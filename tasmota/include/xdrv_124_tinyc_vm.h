@@ -4169,6 +4169,7 @@ static inline void tc_global_write_with_watch(TcVM *vm, uint16_t gidx, int32_t n
 // name: variable name, umode: '=' (ASCII) or ':' (binary), data: raw bytes after delimiter
 // datalen: length of remaining data (for array detection)
 void tc_udp_on_receive(const char *name, char umode, const char *data, int datalen) {
+#endif // !OTTELLO_TC_NOSML
   if (!Tinyc) return;
   if (!Tinyc->udp_used) return;
 
@@ -6152,6 +6153,7 @@ static bool tc_pin_forbidden(int32_t pin) {
     return TC_ERR_FORBIDDEN_PIN; \
   }
 
+#if !defined(OTTELLO_TC_NOSML)
 /*********************************************************************************************\
  * SML descriptor pin substitution helpers — used by SYS_SML_APPLY_PINS
  *
@@ -7074,6 +7076,7 @@ static const char *tc_mscr_find_section(const char *buf, size_t buf_len, const c
 static int tc_mscr_load(const char *path) {
 #ifdef USE_UFILESYS
   memset(&tc_mscr, 0, sizeof(tc_mscr));
+#endif // !OTTELLO_TC_NOSML
   char fpath[128]; strlcpy(fpath, path, sizeof(fpath));
   FS *fsp = tc_file_path(fpath);
   if (!fsp) return -1;
@@ -7115,6 +7118,8 @@ static int tc_mscr_load(const char *path) {
   return -1;
 #endif
 }
+
+#endif // !OTTELLO_TC_NOSML
 
 /*********************************************************************************************\
  * Cross-VM shared key/value store
@@ -13244,6 +13249,7 @@ static int tc_syscall_impl(TcVM *vm, uint16_t id) {
       }
       break;
     }
+#if !defined(OTTELLO_TC_NOSML)
     case SYS_SML_APPLY_PINS: {
       // smlApplyPins("/path", rx, tx, smlf) — idempotent template-comment-preserving pin
       // substitution. Recognized placeholders: %0?rxpin%, %0?txpin%, %0?smlf%.
@@ -13395,6 +13401,7 @@ static int tc_syscall_impl(TcVM *vm, uint16_t id) {
       TC_PUSH(vm, rc);
       break;
     }
+#endif // !OTTELLO_TC_NOSML
     case SYS_WEB_REPO_PULLDOWN: {
       // webRepoPulldown(&sel, "label", "json_url", "index_key", "/dest_path")
       //   Fetches {json_url} (a Scripter-smlpd-compatible directory JSON of the form
@@ -22662,6 +22669,7 @@ static void tc_slot_callback_id(TcSlot *s, TcCallbackId cid) {
 // Defined here (not in .ino) because TcCallbackId param confuses Arduino's
 // auto-prototyper (same reason tc_slot_callback* lives in vm.h).
 static void tc_all_callbacks_id(TcCallbackId cid) {
+#if !defined(OTTELLO_TC_NOSML)
   // Mini-Scripter ticks first (cheap, no slot lookup needed). Bytecode is
   // populated only after a successful smlScripterLoad() — otherwise no-op.
   if (cid == TC_CB_EVERY_100_MSECOND) tc_mscr_tick_f();
@@ -22787,6 +22795,7 @@ static void TinyCStopVM(TcSlot *s) {
   tc_pcnt_close_all((void *)s);                       // the PCNT units this slot opened
 #endif
   tc_img_store_free();
+#if !defined(OTTELLO_TC_NOSML)
   // Clear mini-scripter state — otherwise the >F/>S bytecode from the previous
   // .tcb keeps firing on EverySecond/Every100ms ticks and (e.g.) re-emits the
   // IEC 62056-21 wake-up handshake even after the script that loaded it is
