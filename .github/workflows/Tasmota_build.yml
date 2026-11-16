@@ -23,6 +23,7 @@ jobs:
           - tasmota32
           - tasmota32-safeboot
           - tasmota32-ottelo-pow-slim
+          - tasmota32-ottelo-tc-nosml
     steps:
       - name: Checkout this branch only
         uses: actions/checkout@v4
@@ -60,6 +61,25 @@ jobs:
           if "\\\\${env:tasmota32_base.build_flags}" in rendered or "\\${env:tasmota32_base.build_flags}" in rendered:
               raise SystemExit("PlatformIO left the base build_flags interpolation unresolved")
           print("Resolved PlatformIO config contains both required POW Slim build flags.")
+          PY
+
+      - name: Verify resolved full Otello TC no-SML configuration
+        if: matrix.environment == 'tasmota32-ottelo-tc-nosml'
+        run: |
+          pio project config --json-output > /tmp/pio-project-config.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          config = json.loads(Path("/tmp/pio-project-config.json").read_text())
+          rendered = json.dumps(config, sort_keys=True)
+          required = ("-DUSE_CONFIG_OVERRIDE", "-DOTTELLO_TC_NOSML", "-DFIRMWARE_TASMOTA32")
+          missing = [flag for flag in required if flag not in rendered]
+          if missing:
+              raise SystemExit("Resolved Otello TC no-SML configuration is missing: " + ", ".join(missing))
+          if "\\\\${env:tasmota32_base.build_flags}" in rendered or "\\${env:tasmota32_base.build_flags}" in rendered:
+              raise SystemExit("PlatformIO left the base build_flags interpolation unresolved")
+          print("Resolved full Otello TC no-SML configuration is active.")
           PY
 
       - name: Build firmware
