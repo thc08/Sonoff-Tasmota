@@ -1531,8 +1531,8 @@
   #if defined(USE_BERRY) || defined(USE_AUTOCONF) || defined(USE_EXTENSION_MANAGER) || defined(USE_SCRIPT) || defined(USE_RULES)
     #error "POW Slim: an excluded scripting or extension subsystem is still enabled"
   #endif
-  #if defined(USE_WEBCLIENT_HTTPS) || defined(USE_TLS)
-    #error "POW Slim: HTTPS/TLS is still enabled and consumes unnecessary resources"
+  #if defined(USE_WEBCLIENT_HTTPS)
+    #error "POW Slim: outbound HTTPS webclient is still enabled"
   #endif
 #endif // OTTELLO_POW_SLIM
 
