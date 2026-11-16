@@ -1531,7 +1531,7 @@
   #if defined(USE_BERRY) || defined(USE_AUTOCONF) || defined(USE_EXTENSION_MANAGER) || defined(USE_SCRIPT) || defined(USE_RULES)
     #error "POW Slim: an excluded scripting or extension subsystem is still enabled"
   #endif
-  #if defined(USE_AC_ZERO_CROSS_DIMMER) || defined(USE_COUNTER) || defined(USE_KNX) || defined(USE_KNX_WEB_MENU) || defined(USE_TUYA_MCU) || defined(USE_SHUTTER) || defined(USE_IR_REMOTE) || defined(USE_DHT) || defined(USE_SERIAL_BRIDGE) || defined(USE_DEEPSLEEP) || defined(USE_IMPROV)
+  #if defined(USE_AC_ZERO_CROSS_DIMMER) || defined(USE_COUNTER) || defined(USE_KNX) || defined(USE_KNX_WEB_MENU) || defined(USE_TUYA_MCU) || defined(USE_TUYA_TIME) || defined(USE_SHUTTER) || defined(USE_IR_REMOTE) || defined(USE_DHT) || defined(USE_SERIAL_BRIDGE) || defined(USE_DEEPSLEEP) || defined(USE_IMPROV) || defined(USE_SONOFF_RF) || defined(USE_RF_FLASH) || defined(USE_SONOFF_SC) || defined(USE_ARMTRONIX_DIMMERS) || defined(USE_PS_16_DZ) || defined(USE_SONOFF_IFAN) || defined(USE_BUZZER) || defined(USE_ARILUX_RF) || defined(USE_EXS_DIMMER) || defined(USE_DEVICE_GROUPS) || defined(USE_PWM_DIMMER) || defined(USE_SONOFF_D1) || defined(USE_SHELLY_DIMMER) || defined(USE_LIGHT) || defined(USE_WS2812) || defined(USE_HLW8012) || defined(USE_BL09XX) || defined(USE_CSE7761) || defined(USE_UNISHOX_COMPRESSION) || defined(USE_SENDMAIL) || defined(USE_TELEGRAM)
     #error "POW Slim: an unrelated Tasmota driver is still enabled"
   #endif
   #if defined(USE_HLW8012) || defined(USE_BL09XX) || defined(USE_CSE7761) || defined(USE_ENERGY_DUMMY)
