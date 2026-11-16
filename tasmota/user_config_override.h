@@ -154,6 +154,13 @@
 #define USE_MQTT_TLS
 #define USE_INFLUXDB
 
+// Original generic ESP32 Otello target also supports WT32-ETH01 Ethernet.
+#define USE_ETHERNET
+#define USE_WT32_ETH01
+#define ETH_TYPE 0
+#define ETH_ADDRESS 0
+#define ETH_CLKMODE 3
+
 // Original Otello TC-specific configuration.
 #define USE_MATTER_C
 #define USE_MATTER_C_PLUGIN_ONLY
