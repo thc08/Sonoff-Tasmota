@@ -56,9 +56,12 @@
 #undef USE_EMULATION_HUE
 #undef USE_EMULATION_WEMO
 
-// No Tasmota I2C/SPI peripherals are connected; TM1621 is GPIO-driven.
+// No Tasmota I2C/SPI peripherals or SD-card interface are connected;
+// LittleFS remains enabled for the TinyC browser IDE.
 #undef USE_I2C
 #undef USE_SPI
+#undef USE_SDCARD
+#undef USE_SD_MMC
 #undef USE_MIBLE
 
 // No timers, sunrise, rules, counter, dimmer, or unrelated device protocols.
@@ -230,7 +233,7 @@
 #if defined(USE_PZEM004T) || defined(USE_PZEM_AC) || defined(USE_PZEM_DC) || defined(USE_MCP39F501) || defined(USE_ADE7880) || defined(USE_ADE7953) || defined(USE_SDM72) || defined(USE_SDM120) || defined(USE_SDM230) || defined(USE_SDM630) || defined(USE_DDS2382) || defined(USE_DDSU666) || defined(USE_SOLAX_X1) || defined(USE_LE01MR) || defined(USE_TELEINFO) || defined(USE_IEM3000) || defined(USE_BL6523) || defined(USE_MODBUS_ENERGY) || defined(USE_ENERGY_DUMMY)
   #error "POW Slim: an unused energy-meter driver is still enabled"
 #endif
-#if defined(USE_AC_ZERO_CROSS_DIMMER) || defined(USE_COUNTER) || defined(USE_KNX) || defined(USE_KNX_WEB_MENU) || defined(USE_TUYA_MCU) || defined(USE_TUYA_TIME) || defined(USE_SHUTTER) || defined(USE_IR_REMOTE) || defined(USE_DHT) || defined(USE_DHT12) || defined(USE_MAX31855) || defined(USE_MAX31865) || defined(USE_SERIAL_BRIDGE) || defined(USE_DEEPSLEEP) || defined(USE_IMPROV) || defined(USE_SPI_LORA) || defined(USE_LORA_SX126X) || defined(USE_LORA_SX127X) || defined(USE_LORAWAN_BRIDGE) || defined(USE_TUYAMCUBR) || defined(USE_SONOFF_RF) || defined(USE_RF_FLASH) || defined(USE_SONOFF_SC) || defined(USE_ARMTRONIX_DIMMERS) || defined(USE_PS_16_DZ) || defined(USE_SONOFF_IFAN) || defined(USE_BUZZER) || defined(USE_ARILUX_RF) || defined(USE_EXS_DIMMER) || defined(USE_DEVICE_GROUPS) || defined(USE_PWM_DIMMER) || defined(USE_SONOFF_D1) || defined(USE_SHELLY_DIMMER) || defined(USE_LIGHT) || defined(USE_WS2812) || defined(USE_HLW8012) || defined(USE_BL09XX) || defined(USE_CSE7761) || defined(USE_UNISHOX_COMPRESSION) || defined(USE_SENDMAIL) || defined(USE_TELEGRAM)
+#if defined(USE_AC_ZERO_CROSS_DIMMER) || defined(USE_COUNTER) || defined(USE_KNX) || defined(USE_KNX_WEB_MENU) || defined(USE_TUYA_MCU) || defined(USE_TUYA_TIME) || defined(USE_SHUTTER) || defined(USE_IR_REMOTE) || defined(USE_DHT) || defined(USE_DHT12) || defined(USE_MAX31855) || defined(USE_MAX31865) || defined(USE_SERIAL_BRIDGE) || defined(USE_DEEPSLEEP) || defined(USE_IMPROV) || defined(USE_SDCARD) || defined(USE_SD_MMC) || defined(USE_SPI_LORA) || defined(USE_LORA_SX126X) || defined(USE_LORA_SX127X) || defined(USE_LORAWAN_BRIDGE) || defined(USE_TUYAMCUBR) || defined(USE_SONOFF_RF) || defined(USE_RF_FLASH) || defined(USE_SONOFF_SC) || defined(USE_ARMTRONIX_DIMMERS) || defined(USE_PS_16_DZ) || defined(USE_SONOFF_IFAN) || defined(USE_BUZZER) || defined(USE_ARILUX_RF) || defined(USE_EXS_DIMMER) || defined(USE_DEVICE_GROUPS) || defined(USE_PWM_DIMMER) || defined(USE_SONOFF_D1) || defined(USE_SHELLY_DIMMER) || defined(USE_LIGHT) || defined(USE_WS2812) || defined(USE_HLW8012) || defined(USE_BL09XX) || defined(USE_CSE7761) || defined(USE_UNISHOX_COMPRESSION) || defined(USE_SENDMAIL) || defined(USE_TELEGRAM)
   #error "POW Slim: an unrelated Tasmota driver is still enabled"
 #endif
 
