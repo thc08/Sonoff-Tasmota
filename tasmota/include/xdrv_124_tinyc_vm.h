@@ -4169,7 +4169,6 @@ static inline void tc_global_write_with_watch(TcVM *vm, uint16_t gidx, int32_t n
 // name: variable name, umode: '=' (ASCII) or ':' (binary), data: raw bytes after delimiter
 // datalen: length of remaining data (for array detection)
 void tc_udp_on_receive(const char *name, char umode, const char *data, int datalen) {
-#endif // !OTTELLO_TC_NOSML
   if (!Tinyc) return;
   if (!Tinyc->udp_used) return;
 
@@ -7076,7 +7075,6 @@ static const char *tc_mscr_find_section(const char *buf, size_t buf_len, const c
 static int tc_mscr_load(const char *path) {
 #ifdef USE_UFILESYS
   memset(&tc_mscr, 0, sizeof(tc_mscr));
-#endif // !OTTELLO_TC_NOSML
   char fpath[128]; strlcpy(fpath, path, sizeof(fpath));
   FS *fsp = tc_file_path(fpath);
   if (!fsp) return -1;
@@ -22674,6 +22672,7 @@ static void tc_all_callbacks_id(TcCallbackId cid) {
   // populated only after a successful smlScripterLoad() — otherwise no-op.
   if (cid == TC_CB_EVERY_100_MSECOND) tc_mscr_tick_f();
   else if (cid == TC_CB_EVERY_SECOND) tc_mscr_tick_s();
+#endif // !OTTELLO_TC_NOSML
   if (!Tinyc) return;
   for (uint8_t i = 0; i < TC_MAX_VMS; i++) {
     TcSlot *s = Tinyc->slots[i];
@@ -22802,6 +22801,7 @@ static void TinyCStopVM(TcSlot *s) {
   // gone. Next smlScripterLoad() in a new .tcb repopulates; scripts that
   // don't call it get a silent mscr (loaded=0 → tick no-ops).
   memset(&tc_mscr, 0, sizeof(tc_mscr));
+#endif // !OTTELLO_TC_NOSML
 #ifdef ESP32
   // Stop I2S output if active
   if (Tinyc->i2s_tx_handle) {
