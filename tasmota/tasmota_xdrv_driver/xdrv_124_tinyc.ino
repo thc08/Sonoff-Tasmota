@@ -5811,7 +5811,8 @@ static void HandleSmlChartEditor(void) {
     yield();
   }
   f.close();
-}#endif // !OTTELLO_TC_NOSML
+}
+#endif  // !OTTELLO_TC_NOSML
 
 #endif  // USE_UFILESYS
 
