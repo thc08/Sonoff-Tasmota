@@ -100,7 +100,6 @@
 // TM1621 is GPIO-driven and CSE7766 is UART-driven. Keep unrelated sensor
 // drivers out even though the generic ESP32 configuration enables them.
 #undef USE_I2C
-#undef USE_SPI
 #undef USE_SHT
 #undef USE_HTU
 #undef USE_BMP
