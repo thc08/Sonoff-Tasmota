@@ -1536,7 +1536,16 @@
   #endif
 #endif // OTTELLO_POW_SLIM
 
-/*********************************************************************************************\
+/*********************************************************************************************\\
+ * Validate the full Otello TinyC profile with SML removed
+\\*********************************************************************************************/
+#if defined(OTTELLO_TC_NOSML)
+  #if defined(USE_SML_M) || defined(USE_SML) || defined(USE_SML_SCRIPT_CMD)
+    #error "Otello TC no-SML: an SML driver or TinyC SML command hook is still enabled"
+  #endif
+#endif // OTTELLO_TC_NOSML
+
+/*********************************************************************************************\\
  * Post-process stack size adjustment
 \*********************************************************************************************/
 
