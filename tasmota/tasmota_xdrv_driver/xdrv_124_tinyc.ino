@@ -79,9 +79,14 @@
 // 17.10.2026) found the "Repo selection box" gone after the switch. The entry whose <base>/bytecode equals
 // TINYC_DEFAULT_REPO is preselected, so our default stays ours.
 #ifndef TINYC_REPO_LIST
+#ifdef OTTELLO_TC_NOSML
+#define TINYC_REPO_LIST \
+  "TinyC Examples (gemu2015)|https://raw.githubusercontent.com/gemu2015/Sonoff-Tasmota/universal/tasmota/tinyc"
+#else
 #define TINYC_REPO_LIST \
   "TinyC Examples (gemu2015)|https://raw.githubusercontent.com/gemu2015/Sonoff-Tasmota/universal/tasmota/tinyc\n" \
   "SmartMeter/PV/Emulator (ottelo)|https://raw.githubusercontent.com/ottelo9/tasmota-sml-script/main/tinyc"
+#endif
 #endif
 
 // Cap for the list, whether compiled in or read from the file. Four entries of
@@ -5757,6 +5762,7 @@ static void HandleTinyCIde(void) {
 #endif  // USE_UFILESYS
 #endif  // USE_TINYC_IDE
 
+#if !defined(OTTELLO_TC_NOSML)
 // ---- /cedit: serve sml_chart_editor.html from FS as inline text/html ----
 // Companion to tasmota/tinyc/utils/sml_chart_editor.html. The user uploads that
 // file (preferably .html.gz) to the device's filesystem, then visits
@@ -5805,7 +5811,8 @@ static void HandleSmlChartEditor(void) {
     yield();
   }
   f.close();
-}
+}#endif // !OTTELLO_TC_NOSML
+
 #endif  // USE_UFILESYS
 
 // ---- WebUI: shared sv= parameter handler ----
@@ -9092,7 +9099,9 @@ bool Xdrv124(uint32_t function) {
       WebServer_on(PSTR("/ide"), HandleTinyCIde);
 #endif
 #ifdef USE_UFILESYS
+#if !defined(OTTELLO_TC_NOSML)
       WebServer_on(PSTR("/cedit"), HandleSmlChartEditor);
+#endif // !OTTELLO_TC_NOSML
 #endif
 #ifdef USE_HOMEKIT
       WebServer_on(PSTR("/hk"), HandleHomeKitQR);
