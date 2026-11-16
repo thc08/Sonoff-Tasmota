@@ -9,6 +9,9 @@
 
 #ifdef OTTELLO_POW_SLIM
 
+// Slim must not expose Otello's SML chart editor or SmartMeter/PV repository.
+#define OTTELLO_TC_NOSML
+
 // Required POW Elite profile.
 #define USE_TINYC
 #define USE_TINYC_IDE
