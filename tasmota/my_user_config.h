@@ -1531,6 +1531,12 @@
   #if defined(USE_BERRY) || defined(USE_AUTOCONF) || defined(USE_EXTENSION_MANAGER) || defined(USE_SCRIPT) || defined(USE_RULES)
     #error "POW Slim: an excluded scripting or extension subsystem is still enabled"
   #endif
+  #if defined(USE_AC_ZERO_CROSS_DIMMER) || defined(USE_COUNTER) || defined(USE_KNX) || defined(USE_KNX_WEB_MENU) || defined(USE_TUYA_MCU) || defined(USE_SHUTTER) || defined(USE_IR_REMOTE) || defined(USE_DHT) || defined(USE_SERIAL_BRIDGE) || defined(USE_DEEPSLEEP) || defined(USE_IMPROV)
+    #error "POW Slim: an unrelated Tasmota driver is still enabled"
+  #endif
+  #if defined(USE_HLW8012) || defined(USE_BL09XX) || defined(USE_CSE7761) || defined(USE_ENERGY_DUMMY)
+    #error "POW Slim: an unused energy-meter driver is still enabled"
+  #endif
   #if defined(USE_WEBCLIENT_HTTPS)
     #error "POW Slim: outbound HTTPS webclient is still enabled"
   #endif
