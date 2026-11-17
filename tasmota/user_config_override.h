@@ -344,7 +344,7 @@
   #ifndef USE_CSE7766
     #define USE_CSE7766
   #endif
-  #define USE_DISPLAY             // Display-Framework aktivieren (Menue/Display-Unterstuetzung)
+  // Kein allgemeines USE_DISPLAY: TM1621 wird separat durch XDRV_87 aktiviert.
   #define USE_DISPLAY_TM1621_SONOFF // Sonoff POWR316D/POW Elite TM1621-Segmentdisplay
 
   //-- TinyC VM + selbstgehostete Browser-IDE
@@ -403,7 +403,7 @@
   #ifndef USE_DISPLAY_TM1621_SONOFF
     #define USE_DISPLAY_TM1621_SONOFF
   #endif
-  #define USE_DISPLAY             // Nur die benoetigte Display-Unterstuetzung fuer POWR316D
+  // Kein allgemeines USE_DISPLAY: TM1621 wird separat durch XDRV_87 aktiviert.
 
   //-- Schlankes Geraeteprofil: keine ungenutzten Sensoren, Meter oder Netzwerkdienste.
   #undef USE_SML_M
