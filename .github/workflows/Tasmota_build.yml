@@ -51,7 +51,7 @@ jobs:
           config = json.loads(Path("/tmp/pio-project-config.json").read_text())
           rendered = json.dumps(config, sort_keys=True)
           required = (
-              "-DFIRMWARE_TASMOTA32",
+              "-DOTA_URL=",
               "-DTASMOTA32_OTTELO",
               "-DOTTELO_VARIANT_TC",
               "esp32_partition_app1856k_fs1344k.csv",
@@ -61,7 +61,9 @@ jobs:
               raise SystemExit("Resolved original Otello TC configuration is missing: " + ", ".join(missing))
           if "\\\\${env:tasmota32_base.build_flags}" in rendered or "\\${env:tasmota32_base.build_flags}" in rendered:
               raise SystemExit("PlatformIO left the base build_flags interpolation unresolved")
-          print("Resolved original Otello TC profile and original TinyC partition layout.")
+          if "-DFIRMWARE_TASMOTA32" in rendered:
+              raise SystemExit("Unexpected generic FIRMWARE_TASMOTA32 flag in original Otello profile")
+          print("Resolved original Otello TC profile, feature flags and TinyC partition layout.")
           PY
 
       - name: Build firmware
