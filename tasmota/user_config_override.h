@@ -1,167 +1,90 @@
 /*
-  Variant-specific configuration overrides.
-  This file is included by my_user_config.h when USE_CONFIG_OVERRIDE is set.
-  All customizations are guarded so the standard Tasmota environments remain unchanged.
+  user_config_override.h - user configuration overrides my_user_config.h for Tasmota
+
+  Copyright (C) 2021  Theo Arends
+
+  This program is free software: you can redistribute it and/or modify
+  it under the terms of the GNU General Public License as published by
+  the Free Software Foundation, either version 3 of the License, or
+  (at your option) any later version.
+
+  This program is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  GNU General Public License for more details.
+
+  You should have received a copy of the GNU General Public License
+  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 #ifndef _USER_CONFIG_OVERRIDE_H_
 #define _USER_CONFIG_OVERRIDE_H_
 
-#ifdef OTTELLO_POW_SLIM
+/*****************************************************************************************************\
+ * USAGE:
+ *   To modify the stock configuration without changing the my_user_config.h file:
+ *   (1) copy this file to "user_config_override.h" (It will be ignored by Git)
+ *   (2) define your own settings below
+ *
+ ******************************************************************************************************
+ * ATTENTION:
+ *   - Changes to SECTION1 PARAMETER defines will only override flash settings if you change define CFG_HOLDER.
+ *   - Expect compiler warnings when no ifdef/undef/endif sequence is used.
+ *   - You still need to update my_user_config.h for major define USE_MQTT_TLS.
+ *   - All parameters can be persistent changed online using commands via MQTT, WebConsole or Serial.
+\*****************************************************************************************************/
 
-// TinyC VM, browser IDE and LittleFS-backed files/charts/backups.
-#define USE_TINYC
-#define USE_TINYC_IDE
-#define USE_UFILESYS
+/*****************************************************************************************************\
+ * Tasmota Image erstellen - Anleitung für ESP32 / ESP8266
+ ******************************************************************************************************
+ * Diese Features/Treiber (defines) habe ich für meine ESP32 / ESP8266 Tasmota Images/Firmware verwendet, die
+ * ich auf ottelo.jimdo.de zum Download anbiete. Diese Datei kann euch auch dabei helfen ein eigenes
+ * angepasstes Tasmota Image für euren ESP mit Gitpod (oder Visual Studio) zu erstellen, wenn ihr mit dem ESP
+ * ein Stromzähler mit einem Lesekopf auslesen wollt (SML) oder eine smarte Steckdose mit Energiemessfunktion
+ * (SonOff, Gosund, Shelly) habt und ihr Liniendiagramme (Google Chart Script) für den Verbrauch haben wollt.
+ * Andernfalls verwendet einfach die originalen Images. Diese Datei in euer Tasmota Verzeichnis
+ * "tasmota\user_config_override.h" kopieren. Die andere Datei "platformio_tasmota_cenv.ini" mit meinen
+ * Varianten kommt ins Hauptverzeichnis von Tasmota. Eine detaillierte Anleitung findet ihr auf github.
+ *
+ * Es gibt für jede ESP32-Plattform zwei Varianten (ESP8266 nur _tas):
+ *   _tas  → klassischer Tasmota-Scripter (Tasmota Scripting Language, Google Charts)
+ *   _tc   → TinyC VM + Browser-IDE (https://github.com/gemu2015/Sonoff-Tasmota/tree/universal/tasmota/tinyc)
+ *
+ * Zum Kompilieren unter Gitpod den passenden Befehl in die Console eingeben:
+ * ESP32 (jeweils _tas oder _tc):
+ * platformio run -e tasmota32_ottelo_tas        (Generic ESP32, Scripter)
+ * platformio run -e tasmota32_ottelo_tc         (Generic ESP32, TinyC)
+ * platformio run -e tasmota32s2_ottelo_tas / _tc
+ * platformio run -e tasmota32s3_ottelo_tas / _tc
+ * platformio run -e tasmota32c3_ottelo_tas / _tc
+ * platformio run -e tasmota32c6_ottelo_tas / _tc
+ * platformio run -e tasmota32solo1_ottelo_tas / _tc   (ESP32-S1 Single Core z.B. WT32-ETH01 v1.1)
+ * platformio run -e tasmota32p4_ottelo_tas / _tc
+ * Mehr Infos bzgl. ESP32 Versionen: https://tasmota.github.io/docs/ESP32/#esp32_1
+ *
+ * ESP8266:
+ * platformio run -e tasmota1m_ottelo_tas        (1M Flash, nur Scripter)
+ * platformio run -e tasmota1m_energy_ottelo_tas (1M, Update nur über minimal. SonOff POW (R2) / Gosund EP2 / SonOff Dual R3 v2 / Nous A1T)
+ * platformio run -e tasmota1m_shelly_ottelo_tas (1M, Update nur über minimal. Mit Shelly Pro 3EM / EcoTracker Emulation für Marstek Venus / Jupiter)
+ * platformio run -e tasmota4m_ottelo_tas        (>= 4M Flash, nur Scripter — kein _tc, ESP8266 4M hat kein I2C fuer den BinPlugin-Loader)
+ *
+ * Alle Images bauen (Bash + jq):
+ *   pio run $(pio project config --json-output | jq -r '.[] | .[0] | select(test("_ottelo_(tc|tas)$")) | sub("env:"; "-e ")')
+ *
+ * für weitere ESPs siehe: https://github.com/arendst/Tasmota/blob/development/platformio_override_sample.ini bei default_envs
+\*****************************************************************************************************/
 
-// Sonoff POW Elite 316D/320D: both use CSE7766; display is GPIO-driven TM1621.
-#ifndef USE_ENERGY_SENSOR
-  #define USE_ENERGY_SENSOR
-#endif
-#ifndef USE_CSE7766
-  #define USE_CSE7766
-#endif
-#define USE_DISPLAY
-#define USE_DISPLAY_TM1621_SONOFF
+//siehe platformio_tasmota_cenv.ini
+#if ( defined(TASMOTA32C3_OTTELO) || defined(TASMOTA32C6_OTTELO)      || defined(TASMOTA32S2_OTTELO)      || defined(TASMOTA32S3_OTTELO) || \
+      defined(TASMOTA32_OTTELO)   || defined(TASMOTA32SOLO1_OTTELO)   || defined(TASMOTA32P4_OTTELO)      || defined(TASMOTA32P4R3_OTTELO) || \
+      defined(TASMOTA1M_OTTELO)  || defined(TASMOTA1M_SHELLY_OTTELO) || defined(TASMOTA1M_ENERGY_OTTELO) || defined(TASMOTA4M_OTTELO) )
 
-// Remove unused energy-meter drivers. Keep CSE7766.
-#undef USE_SML_M
-#undef USE_SML_SCRIPT_CMD
-#undef USE_ENERGY_DUMMY
-#undef USE_BL0942
-#undef USE_PZEM004T
-#undef USE_PZEM_AC
-#undef USE_PZEM_DC
-#undef USE_MCP39F501
-#undef USE_ADE7880
-#undef USE_ADE7953
-#undef USE_SDM120
-#undef USE_SDM630
-#undef USE_DDS2382
-#undef USE_DDSU666
-#undef USE_SOLAX_X1
-#undef USE_LE01MR
-#undef USE_TELEINFO
-
-// Remove large optional subsystems not used by this device.
-#undef USE_BLE_ESP32
-#undef USE_MI_ESP32
-#undef USE_ZIGBEE
-#undef USE_MATTER_DEVICE
-#undef USE_MATTER_C_PLUGIN_ONLY
-#undef USE_BERRY
-#undef USE_AUTOCONF
-#undef USE_EXTENSION_MANAGER
-// Disable Tasmota's outbound HTTPS webclient, but keep BearSSL itself for
-// TinyC raw TLS syscalls (tlsConnect/tlsWrite/tlsRead and certificate helpers).
-#undef USE_WEBCLIENT_HTTPS
-#define USE_TLS
-#undef USE_SCRIPT
-#undef USE_RULES
-
-// No Tasmota I2C peripherals are connected. TinyC's native SPI API uses
-// the framework SPI class, so include it before tasmota.ino checks USE_SPI;
-// the post-config override removes all external SPI devices and SD-card support.
-#undef USE_I2C
-#define USE_SPI
-
-// Remove unrelated default Tasmota drivers and automation. This target is a
-// POW Elite (relay + CSE7766 + TM1621), not a general-purpose dimmer/controller.
-#undef USE_IMPROV
-#undef USE_SENDMAIL
-#undef USE_ESP32MAIL
-#undef USE_TELEGRAM
-#undef USE_UNISHOX_COMPRESSION
-#undef USE_MQTT_TLS_ECDSA
-
-#undef USE_TIMERS
-#undef USE_TIMERS_WEB
-#undef USE_SUNRISE
-#undef USE_RULES
-#undef SUPPORT_MQTT_EVENT
+// (1) Folgende unnötige Features (siehe my_user_config.h) habe ich deaktiviert, um Tasmota schlank zu halten. Der ESP8266 z.B. hat wenig RAM,
+//     dort müssen mindestens 12k RAM für einen stabilen Betrieb frei sein (inkl. Script).
+#undef USE_DOMOTICZ       //https://tasmota.github.io/docs/Domoticz/ MQTT
+#undef USE_EMULATION_HUE
+#undef USE_EMULATION_WEMO
 #undef ROTARY_V1
-#undef USE_COUNTER
-#undef USE_AC_ZERO_CROSS_DIMMER
-#undef USE_DEEPSLEEP
-#undef USE_SERIAL_BRIDGE
-
-#undef USE_DOMOTICZ
-#undef USE_HOME_ASSISTANT
-#undef USE_TASMOTA_DISCOVERY
-#undef USE_DISCOVERY
-#undef USE_KNX
-#undef USE_KNX_WEB_MENU
-#undef USE_EMULATION_HUE
-#undef USE_EMULATION_WEMO
-
-#undef USE_SONOFF_RF
-#undef USE_RF_FLASH
-#undef USE_SONOFF_SC
-#undef USE_TUYA_MCU
-#undef USE_TUYA_TIME
-#undef USE_ARMTRONIX_DIMMERS
-#undef USE_PS_16_DZ
-#undef USE_SONOFF_IFAN
-#undef USE_BUZZER
-#undef USE_ARILUX_RF
-#undef USE_SHUTTER
-#undef USE_EXS_DIMMER
-#undef USE_DEVICE_GROUPS
-#undef USE_DEVICE_GROUPS_SEND
-#undef USE_PWM_DIMMER
-#undef USE_PWM_DIMMER_REMOTE
-#undef USE_SONOFF_D1
-#undef USE_SHELLY_DIMMER
-#undef SHELLY_CMDS
-#undef SHELLY_FW_UPGRADE
-
-#undef USE_LIGHT
-#undef USE_MY92X1
-#undef USE_SM16716
-#undef USE_SM2135
-#undef USE_SM2335
-#undef USE_BP1658CJ
-#undef USE_BP5758D
-#undef USE_SONOFF_L1
-#undef USE_ELECTRIQ_MOODL
-#undef USE_LIGHT_PALETTE
-#undef USE_LIGHT_VIRTUAL_CT
-#undef USE_DGR_LIGHT_SEQUENCE
-#undef USE_WS2812
-
-#undef USE_DHT
-#undef USE_IR_REMOTE
-#undef USE_IR_SEND_NEC
-#undef USE_IR_SEND_RC5
-#undef USE_IR_SEND_RC6
-#undef USE_IR_RECEIVE
-#undef USE_MIBLE
-#undef USE_HM10
-
-// Keep the CSE7766 only; no other energy-meter hardware is present.
-#undef USE_HLW8012
-#undef USE_BL09XX
-#undef USE_CSE7761
-
-#undef USE_GPIO_VIEWER
-#undef USE_ESP32_SENSORS
-#undef USE_ADC
-#undef USE_NETWORK_LIGHT_SCHEMES
-#undef USE_WEBSERVER_SSL
-
-#endif  // OTTELLO_POW_SLIM
-
-
-// -----------------------------------------------------------------------------
-// Full Otello TinyC profile without Smart-Meter/SML support.
-// This intentionally does NOT inherit the aggressively reduced POW Slim profile.
-// -----------------------------------------------------------------------------
-#ifdef OTTELLO_TC_NOSML
-
-// Keep the original Otello ESP32 feature profile; remove only SML-specific code.
-#undef USE_DOMOTICZ
-#undef USE_EMULATION_HUE
-#undef USE_EMULATION_WEMO
 #undef USE_SONOFF_RF
 #undef USE_SONOFF_SC
 #undef USE_TUYA_MCU
@@ -191,67 +114,332 @@
 #undef USE_LIGHT_PALETTE
 #undef USE_LIGHT_VIRTUAL_CT
 #undef USE_DGR_LIGHT_SEQUENCE
-#undef USE_SERIAL_BRIDGE
+#undef USE_SERIAL_BRIDGE  //https://tasmota.github.io/docs/Serial-to-TCP-Bridge/#serial-to-tcp-bridge
 #undef USE_ENERGY_DUMMY
+
+// diese Treiber/Features sind !nicht! im ESP8266-1M,-4M und -1M-Shelly Image inkludiert, sondern nur 1M-Energy oder ESP32
+#if ( defined(TASMOTA1M_OTTELO) || defined(TASMOTA1M_SHELLY_OTTELO) || defined(TASMOTA4M_OTTELO))
+  #undef USE_I2C            // I2C ist für die nachfolgenden Treiber erforderlich.
+  #undef USE_ENERGY_SENSOR  // Ist für die nachfolgenden Treiber erforderlich.
+  #undef USE_HLW8012        // SonOff POW / Gosund EP2 (ESP8266)
+  #undef USE_CSE7766        // SonOff POW R2 (ESP8266)
+  #undef USE_BL09XX         // SonOff Dual R3 v2 (ESP8266) / Shelly Plus Plug S (ESP32) / Gosund EP2 (ESP8266)
+  #undef USE_DHT            // DHT11, AM2301 (DHT21, DHT22, AM2302, AM2321) and SI7021 Temperature and Humidity sensor (1k6 code)
+  #undef USE_DS18x20        // Temperature Sensoren z.B. DS18B20
+  #undef USE_DEEPSLEEP      // +1K https://tasmota.github.io/docs/DeepSleep/
+#else
+  #define USE_BMP           // +4K BMP085 BMP180 BMP280 BME280 BME680 (standardmäßig nicht enthalten)!
+  #define DS18X20_MAX_SENSORS 10
+#endif
+
 #undef USE_PZEM004T
 #undef USE_PZEM_AC
 #undef USE_PZEM_DC
 #undef USE_MCP39F501
 #undef USE_IR_REMOTE
-#undef GV_USE_ESPINFO
+#undef GV_USE_ESPINFO //ESP8266 info (+2k1 code) ab 15.2.0
+//ESP32 only features
 #undef USE_GPIO_VIEWER
+#if ( !defined(TASMOTA32_OTTELO) )
+  #undef USE_ADC
+#endif
 #undef USE_NETWORK_LIGHT_SCHEMES
 #undef USE_BERRY
-#undef USE_AUTOCONF
+#undef USE_AUTOCONF       //https://tasmota.github.io/docs/ESP32/#autoconf
 #undef USE_CSE7761
+//----------------------------------------------------------------------------
 
-// SML and its TinyC command hooks are the only Otello features deliberately omitted.
-#undef USE_SML_M
-#undef USE_SML
-#undef USE_SML_SCRIPT_CMD
-#undef USE_SML_CRC
-#undef USE_SML_AUTHKEY
+// (2) Welche ESP32 / ESP8266 Features aktiv sind, wenn mit "build_flags = -DFIRMWARE_TASMOTA32" bzw
+// "build_flags = -DFIRMWARE_TASMOTA32"kompiliert wird
+//     findet ihr in der "tasmota_configurations_ESP32.h" unter #ifdef FIRMWARE_TASMOTA32
 
-// Full Otello ESP32 baseline (not the POW Slim exclusions).
-#define USE_BMP
-#define DS18X20_MAX_SENSORS 10
+//----------------------------------------------------------------------------
+
+// (3) Aktivierte zusätzliche Features (SML, Scripter ODER TinyC, TCP, Ethernet, ...)
+
+//-- Variant-Selektoren (gesetzt via build_flags in platformio_tasmota_cenv.ini):
+//--   -DOTTELO_VARIANT_TAS → klassischer Tasmota-Scripter
+//--   -DOTTELO_VARIANT_TC  → TinyC VM + Browser-IDE (KEIN Scripter)
+//-- ESP8266 (1M alle Varianten + 4M) haben nur _tas; TinyC (_tc) nur auf ESP32.
+#if !defined(OTTELO_VARIANT_TAS) && !defined(OTTELO_VARIANT_TC)
+  #error "OTTELO_VARIANT_TAS oder OTTELO_VARIANT_TC muss in build_flags gesetzt sein"
+#endif
+#if defined(OTTELO_VARIANT_TAS) && defined(OTTELO_VARIANT_TC)
+  #error "OTTELO_VARIANT_TAS und OTTELO_VARIANT_TC schliessen sich gegenseitig aus"
+#endif
+
+//-- Stack size erhöhen (Empfehlung: seit Core3 wird mehr benötigt)
+#undef SET_ESP32_STACK_SIZE
 #define SET_ESP32_STACK_SIZE (12 * 1024)
-#define USE_PING
-#define USE_UFILESYS
-#undef UFSYS_SIZE
-#define UFSYS_SIZE 16384
 
-#define USE_HOME_ASSISTANT
-#define USE_WEBCLIENT_HTTPS
+//-- Filesystem (für SML-Meter-Files, Scripte, TinyC-Bytecode, TinyC-IDE)
+//-- ESP8266 1M hat kein UFILESYS — dort nutzt der Scripter EEPROM (siehe TAS-Block).
+#if ( !defined(TASMOTA1M_OTTELO) && !defined(TASMOTA1M_ENERGY_OTTELO) && !defined(TASMOTA1M_SHELLY_OTTELO) )
+  #define USE_PING // Enable Ping command (+2k code)
+  #define USE_UFILESYS
+  #undef UFSYS_SIZE
+  #if defined(TASMOTA4M_OTTELO)
+    #define UFSYS_SIZE 8192   //ESP8266 4M+
+  #else
+    #define UFSYS_SIZE 16384  //ESP32
+  #endif
+#endif
+
+//-- SML (in beiden Varianten — beim _tc liegt der Meter-Descriptor unter /sml_meter.def)
+#define USE_SML_M
+#define USE_SML_CRC       //enables CRC support for binary SML. Must still be enabled via line like "1,=soC,1024,15". https://tasmota.github.io/docs/Smart-Meter-Interface/#special-commands
+#define USE_SML_AUTHKEY   //selten genutzt, M,=so5
+//-- SML-Script-Cmds (SML_SetBaud / SML_Write / SML_SetOptions, sml[X]-Zugriff).
+//-- Im TAS-Build wuerde xdrv_10_scripter.ino das eh automatisch setzen, im TC-Build
+//-- (kein Scripter) nicht. Daher hier gemeinsam fuer BEIDE explizit definiert —
+//-- der Scripter macht im TAS-Build #undef+#define (idempotent, kein Konflikt).
+#define USE_SML_SCRIPT_CMD
+
+//-- Home Assistant + HTTPS-Client (gemeinsam)
+#define USE_HOME_ASSISTANT  //HA API (+12k code, +6 bytes mem)
+#define USE_WEBCLIENT_HTTPS //für HA benötigt
 #define USE_TLS
-#define USE_ESP32_SW_SERIAL
-#define USE_MQTT_TLS
-#define USE_INFLUXDB
 
-// Original generic ESP32 Otello target also supports WT32-ETH01 Ethernet.
-#define USE_ETHERNET
-#define USE_WT32_ETH01
-#define ETH_TYPE 0
-#define ETH_ADDRESS 0
-#define ETH_CLKMODE 3
+//-- Software Serial / MQTT-TLS / InfluxDB — nur ESP32 (gemeinsam _tas + _tc)
+#if ( !defined(TASMOTA1M_OTTELO) && !defined(TASMOTA4M_OTTELO) && !defined(TASMOTA1M_ENERGY_OTTELO) && !defined(TASMOTA1M_SHELLY_OTTELO) )
+  #define USE_ESP32_SW_SERIAL //Pin mit '-' in der SML/TinyC Konfiguration definieren
+  #define USE_MQTT_TLS        //3KB
+  #define USE_INFLUXDB        //6KB
+#endif
 
-// Original Otello TC-specific configuration.
-#define USE_MATTER_C
-#define USE_MATTER_C_PLUGIN_ONLY
-#define USE_DISCOVERY
-#define WEBSERVER_ADVERTISE
-#define USE_BINPLUGINS
-#define USE_TINYC_REPO_IDE
-#undef USE_RULES
-#define USE_TINYC
-#define USE_TINYC_IDE
-// Use the general TinyC repository/IDE in this no-SML variant; do not
-// point a freshly flashed device at the SmartMeter/SML program collection.
-#define TINYC_DEFAULT_REPO "https://raw.githubusercontent.com/gemu2015/Sonoff-Tasmota/universal/tasmota/tinyc/bytecode"
-#define TINYC_DEFAULT_IDE_URL "https://raw.githubusercontent.com/gemu2015/Sonoff-Tasmota/universal/tasmota/tinyc/tinyc_ide.html.gz"
-#define TINYC_REPO_LIST \
-  "TinyC Examples (gemu2015)|https://raw.githubusercontent.com/gemu2015/Sonoff-Tasmota/universal/tasmota/tinyc"
+//-- Ethernet (WT32-ETH01) - gemeinsam
+#if ( defined(TASMOTA32_OTTELO) || defined(TASMOTA32SOLO1_OTTELO) || defined(TASMOTA32S3_OTTELO) || defined(TASMOTA32P4_OTTELO) || defined(TASMOTA32P4R3_OTTELO) )
+  #define USE_ETHERNET          //Add support for ethernet (+20k code)
+  #define USE_WT32_ETH01
+  #define ETH_TYPE          0
+  #define ETH_ADDRESS       0
+  #define ETH_CLKMODE       3
+#endif
 
-#endif  // OTTELLO_TC_NOSML
+
+//=============================================================================
+// SCRIPTER-Variante (klassische Tasmota Scripting Language + Google Charts)
+//=============================================================================
+#ifdef OTTELO_VARIANT_TAS
+
+  //-- Max String Size: default 255. Wird nun aber im Script mit >D xx definiert!
+  //#define SCRIPT_MAXSSIZE 128
+
+  //-- 4096 statt 256 bytes für Variablennamen und größere Arrays (24h Diagramm) — nur ESP32
+  #if ( !defined(TASMOTA1M_OTTELO) && !defined(TASMOTA1M_ENERGY_OTTELO) && !defined(TASMOTA1M_SHELLY_OTTELO) && !defined(TASMOTA4M_OTTELO) )
+    #define SCRIPT_LARGE_VNBUFF
+    #define MAX_ARRAY_SIZE 2000
+  #endif
+
+  //-- Skriptgröße — ESP8266 1M nutzt EEPROM, größere Targets Filesystem
+  #if ( defined(TASMOTA1M_OTTELO) || defined(TASMOTA1M_ENERGY_OTTELO) || defined(TASMOTA1M_SHELLY_OTTELO) )
+    #define USE_EEPROM
+    #undef EEP_SCRIPT_SIZE
+    #if ( defined(TASMOTA1M_SHELLY_OTTELO) )
+      #define EEP_SCRIPT_SIZE 4096
+    #else
+      #define EEP_SCRIPT_SIZE 8192
+    #endif
+  #else
+    #define USE_SCRIPT_FATFS_EXT //https://tasmota.github.io/docs/Scripting-Language/#extended-commands-09k-flash
+  #endif
+
+  //-- Scripter + Charts + Web-Display
+  #define USE_SCRIPT             //(+36k code, +1k mem)
+  #undef USE_RULES               //USE_SCRIPT & USE_RULES can't both be used at the same time
+  //-- Diagramme und große Arrays nicht im CT002-Image (das Script nutzt keins davon)
+  #ifndef TASMOTA1M_CT002_OTTELO
+    #define USE_GOOGLE_CHARTS
+    #define LARGE_ARRAYS
+  #endif
+  #define USE_SCRIPT_WEB_DISPLAY
+  #ifndef TASMOTA1M_CT002_OTTELO
+    #define USE_CW_CALC          //Kalenderwochen via Variable cw
+  #endif
+  #define USE_HTML_CALLBACK      //für Smartmeter Descriptor dropdown list smlpd()
+
+  #if ( !defined(TASMOTA1M_OTTELO) && !defined(TASMOTA1M_ENERGY_OTTELO) && !defined(TASMOTA1M_SHELLY_OTTELO) )
+    #define USE_ANGLE_FUNC       //~2KB
+    #define USE_FEXTRACT         //~8KB cts()
+  #endif
+
+  //-- Serial / TCP-Server / Task — nur ESP32
+  #if ( !defined(TASMOTA1M_OTTELO) && !defined(TASMOTA4M_OTTELO) && !defined(TASMOTA1M_ENERGY_OTTELO) && !defined(TASMOTA1M_SHELLY_OTTELO) )
+    #define USE_SCRIPT_SERIAL    //3KB
+    #define SCRIPT_FULL_WEBPAGE  //1KB
+    #define USE_SCRIPT_TCP_SERVER
+    #define USE_SCRIPT_TASK
+  #endif
+
+  //-- shellypro3em emulieren (z.B. für Marstek Venus E) — braucht mDNS
+  //-- nicht im CT002-Image: der CT002-Emulator braucht kein mDNS
+  #if ( !defined(TASMOTA1M_OTTELO) && !defined(TASMOTA1M_ENERGY_OTTELO) && !defined(TASMOTA1M_CT002_OTTELO) )
+    #define USE_SCRIPT_MDNS      //14KB
+  #endif
+
+  //-- Marstek CT002: Seite /ctreg zur einmaligen Cloud-Anmeldung (nur Image tasmota1m_ct002,
+  //-- das sonst dem tasmota1m_shelly entspricht). Code: include/xdrv_10_ct002_registration.h
+  #ifdef TASMOTA1M_CT002_OTTELO
+    #define USE_SCRIPT_CT002_REGISTRATION
+  #endif
+
+  //-- globale Variablen + >J Sektion
+  #define USE_SCRIPT_GLOBVARS    //2KB
+  #define USE_SCRIPT_JSON_EXPORT //0KB
+
+  //-- Scriptliste-Menü
+  #if ( !defined(TASMOTA1M_OTTELO) && !defined(TASMOTA1M_ENERGY_OTTELO) && !defined(TASMOTA1M_SHELLY_OTTELO) && !defined(TASMOTA4M_OTTELO) )
+    #define SCRIPT_LIST_DOWNLOAD_URL "https://raw.githubusercontent.com/ottelo9/tasmota-sml-script/main/script-list-menu/scripts/"
+    #define SCRIPT_LIST "scripts.json"
+  #endif
+
+#endif // OTTELO_VARIANT_TAS
+
+
+//=============================================================================
+// TINYC-Variante (TinyC VM + Browser-IDE, KEIN Scripter)
+//=============================================================================
+#ifdef OTTELO_VARIANT_TC
+
+  // Matter-Bridge — https://gemu2015.github.io/Sonoff-Tasmota/reference/?h=#matter-esp32-requires-use_matter_c
+  // Braucht zwingend USE_DISCOVERY (mDNS) für Service-Advertising, sonst
+  // gibt's Linker-Error "undefined reference to StartMdns()" beim Matter-Init.
+  // Tasmota's my_user_config.h hat USE_DISCOVERY per Default auskommentiert.
+  #define USE_MATTER_C
+  //-- Matter nur als Plugin (MATTERF, ab TinyC 1.6.70): die eingebaute Engine
+  //-- kostet auf jedem Gerät ~33 KB RAM, auch ohne Matter. Wer Matter will,
+  //-- lädt das Plugin: tasmota/tinyc/docs/MATTER_PLUGIN_DE.md im gemu2015-Repo.
+  //-- Braucht USE_BINPLUGINS (unten).
+  #define USE_MATTER_C_PLUGIN_ONLY
+  #define USE_DISCOVERY        //+8KB Flash, +0.3KB RAM — mDNS, von Matter benötigt
+  #define WEBSERVER_ADVERTISE  //<Hostname>.local/ — Standard zusammen mit mDNS
+  //-- BinPlugin-Loader: ermöglicht das Nachladen relocatabler Plugin-.bin
+  //-- (Audio, Sensoren, …) zur Laufzeit in die custom-Partition — ohne die
+  //-- Firmware neu zu flashen. Nicht automatisch an (siehe Plugins/readme.md)
+  #define USE_BINPLUGINS
+  
+  // run the FULL IDE from the repo, WITHOUT the IDE living on the device. ~3 KB
+  // new https://github.com/gemu2015/Sonoff-Tasmota/commit/9dde7b0478e4034e309875d439e6e332b328d131
+  #define USE_TINYC_REPO_IDE
+
+  //-- TinyC braucht USE_RULES nicht — der SML-Init-Gate (`Settings->rule_enabled`
+  //-- Bit 0) wird vom TinyC-Programm direkt über die Built-in-Variable `tasm_rule`
+  //-- gesetzt: einfach `tasm_rule = 1;` schaltet SML frei.
+  //-- Beispiel: tasmota/tinyc/examples/marstek_emu.tc
+  //-- Doku: https://gemu2015.github.io/Sonoff-Tasmota/reference/?h=use_sml_m#smart-meter-sml
+  //-- Meter-Descriptor liegt unter /sml_meter.def im Filesystem.
+  #undef USE_RULES
+
+  //-- (USE_SML_SCRIPT_CMD steht jetzt im gemeinsamen SML-Bereich oben — gilt fuer
+  //--  beide Varianten. Im TC-Build wird es fuer die TinyC-mscr-Opcodes SML_BAUD/
+  //--  SML_HEX gebraucht, da hier kein Scripter es automatisch setzt.)
+
+  //-- TinyC VM + selbstgehostete Browser-IDE
+  //-- https://github.com/gemu2015/Sonoff-Tasmota/tree/universal/tasmota/tinyc
+  #define USE_TINYC          //Enable TinyC VM (XDRV_124)
+  #define USE_TINYC_IDE      //Enable self-hosted browser IDE (requires USE_UFILESYS)
+
+  //-- Eigene Quellen statt gemus Repo.
+  //-- REPO    = Ordner mit den .tcb, den die Repository-Box auf /tc anzeigt.
+  //--           Sie liest dort index.txt (eine Datei je Zeile) und laedt die
+  //--           gewaehlte .tcb im Browser direkt in den Slot. Ohne Slash am
+  //--           Ende, den haengt die Seite selbst an. Max. 199 Zeichen.
+  //--           Zur Laufzeit uebersteuerbar mit /tinyc_repo.cfg (leere Datei =
+  //--           Box aus).
+  //-- IDE_URL = Ziel von `TinyCIde`, das die ausgelieferte tinyc_ide.html.gz
+  //--           ersetzt. Vollstaendiger Dateiname, kein Slash dahinter.
+  //-- Wirkt nur mit den #ifndef-Guards in xdrv_124_tinyc.ino (Zeilen 35/42).
+  #define TINYC_DEFAULT_REPO    "https://raw.githubusercontent.com/ottelo9/tasmota-sml-script/main/tinyc/bytecode"
+  #define TINYC_DEFAULT_IDE_URL "https://raw.githubusercontent.com/ottelo9/tasmota-sml-script/main/tinyc/tinyc_ide.html.gz"
+
+  //-- Repo-Auswahl (DropDown auf /tc) (gemus Commit dba1f72). Ein Eintrag je Zeile,
+  //-- "Klarname|BASIS-URL" -- Basis, NICHT .../bytecode. Daraus leitet die
+  //-- Firmware ab:  <basis>/bytecode (.tcb + index.json/index.txt),
+  //--               <basis>/tinyc_ide.html.gz (Update IDE + /tcrepo),
+  //--               <basis>/examples (.tc, IDE -- bei gemu noch offen).
+  //-- Mit nur EINEM Eintrag erscheint kein Menue. Vorauswahl = der Eintrag, dessen
+  //-- <basis>/bytecode gleich TINYC_DEFAULT_REPO ist -> ottelo steht daher oben
+  //-- und muss exakt zu TINYC_DEFAULT_REPO passen.
+  //-- Zur Laufzeit ersetzbar durch /tinyc_repos.cfg (Mehrzahl!, gleiches Format).
+  #define TINYC_REPO_LIST \
+    "SmartMeter/PV/Emulator (ottelo)|https://raw.githubusercontent.com/ottelo9/tasmota-sml-script/main/tinyc\n" \
+    "TinyC Examples (gemu2015)|https://raw.githubusercontent.com/gemu2015/Sonoff-Tasmota/universal/tasmota/tinyc"
+
+  //-- TLS-Empfangspuffer: seit gemus a52ccc35c waehlt der Treiber selbst
+  //-- zwischen 16384 und 4096, je nach groesstem freiem Block. Kein #define
+  //-- noetig; `TinyCHttpRx <bytes>` klemmt ihn zur Laufzeit fest, falls ein
+  //-- Gegenstelle die Automatik nicht passt (0 = automatisch).
+
+#endif // OTTELO_VARIANT_TC
+
+
+//-- Weiteres optionales
+//#define USE_DISPLAY_TM1621_SONOFF //4KB
+//#define USE_SENDMAIL
+//#define USE_DOMOTICZ   //https://tasmota.github.io/docs/Domoticz/ (ca. 6KB Code; oben per #undef aus, hier einkommentieren; nicht auf ESP8266 1M)
+
+
+//=============================================================================
+// OTA-URLs (pro Plattform und Variante)
+//=============================================================================
+#undef OTA_URL
+
+#ifdef OTTELO_VARIANT_TAS
+  #define _OTTELO_SFX "_tas"
+#else
+  #define _OTTELO_SFX "_tc"
+#endif
+
+#if defined(TASMOTA32_OTTELO)
+  #define OTA_URL "https://raw.githubusercontent.com/ottelo9/tasmota-sml-images/main/ota_firmware/ESP32/tasmota32_ottelo" _OTTELO_SFX ".bin"
+#elif defined(TASMOTA32C3_OTTELO)
+  #define OTA_URL "https://raw.githubusercontent.com/ottelo9/tasmota-sml-images/main/ota_firmware/ESP32/tasmota32c3_ottelo" _OTTELO_SFX ".bin"
+#elif defined(TASMOTA32C6_OTTELO)
+  #define OTA_URL "https://raw.githubusercontent.com/ottelo9/tasmota-sml-images/main/ota_firmware/ESP32/tasmota32c6_ottelo" _OTTELO_SFX ".bin"
+#elif defined(TASMOTA32S2_OTTELO)
+  #define OTA_URL "https://raw.githubusercontent.com/ottelo9/tasmota-sml-images/main/ota_firmware/ESP32/tasmota32s2_ottelo" _OTTELO_SFX ".bin"
+#elif defined(TASMOTA32S3_OTTELO)
+  #define OTA_URL "https://raw.githubusercontent.com/ottelo9/tasmota-sml-images/main/ota_firmware/ESP32/tasmota32s3_ottelo" _OTTELO_SFX ".bin"
+#elif defined(TASMOTA32SOLO1_OTTELO)
+  #define OTA_URL "https://raw.githubusercontent.com/ottelo9/tasmota-sml-images/main/ota_firmware/ESP32/tasmota32solo1_ottelo" _OTTELO_SFX ".bin"
+#elif defined(TASMOTA32P4_OTTELO)
+  #define OTA_URL "https://raw.githubusercontent.com/ottelo9/tasmota-sml-images/main/ota_firmware/ESP32/tasmota32p4_ottelo" _OTTELO_SFX ".bin"
+#elif defined(TASMOTA32P4R3_OTTELO)
+  #define OTA_URL "https://raw.githubusercontent.com/ottelo9/tasmota-sml-images/main/ota_firmware/ESP32/tasmota32p4r3_ottelo" _OTTELO_SFX ".bin"
+#elif defined(TASMOTA1M_OTTELO)
+  #define OTA_URL "https://raw.githubusercontent.com/ottelo9/tasmota-sml-images/main/ota_firmware/ESP8266/tasmota1m_ottelo_tas.bin.gz"
+#elif defined(TASMOTA1M_SHELLY_OTTELO)
+  #define OTA_URL "Upgrade nur via minimal.bin moeglich!"
+#elif defined(TASMOTA1M_ENERGY_OTTELO)
+  #define OTA_URL "Upgrade nur via minimal.bin moeglich!"
+#elif defined(TASMOTA4M_OTTELO)
+  #define OTA_URL "https://raw.githubusercontent.com/ottelo9/tasmota-sml-images/main/ota_firmware/ESP8266/tasmota4m_ottelo" _OTTELO_SFX ".bin.gz"
+#endif
+
+//-- Marsrelay: Marstek-Akku ohne Cloud (Env tasmota32s3_marsrelay / tasmota32s3opi_marsrelay)
+//-- Treiber: tasmota_xdrv_driver/xdrv_100_marsrelay.ino, Doku im Dateikopf.
+#ifdef MARSRELAY_BUILD
+  #define USE_MARSRELAY
+  #define USE_WIFI_RANGE_EXTENDER   // AP fuer den Akku neben dem Heim-WLAN (Rgx...-Befehle)
+  // bewusst ohne USE_WIFI_RANGE_EXTENDER_NAPT: der Akku soll keinen Internetzugang haben
+  #undef OTA_URL                    // nie auf das S3-TC-Image ohne Marsrelay updaten
+  #define OTA_URL "https://raw.githubusercontent.com/ottelo9/tasmota-sml-images/main/ota_firmware/ESP32/tasmota32s3_marsrelay.bin"
+#endif
+
+//-- DFRobot DFR1154 AI CAM (Env tasmota32s3_dfr1154): Kamera, Personenerkennung (ESP-DL,
+//-- -DUSE_TINYC_ESPDL in der Env) und Sprachausgabe (PicoTTS, -DUSE_PICOTTS in der Env).
+//-- Audio laeuft ueber gemus Plugin I2SAUDIO_32.bin (USE_BINPLUGINS ist im TC-Block an).
+#ifdef DFR1154_BUILD
+  #define USE_TINYC_CAMERA
+  #define USE_SPI                   // die SD-Karte der Kamera haengt am SPI (GPIO 10-13 in gemus Vorlage)
+  #define USE_SDCARD                // Personenerkennung laedt ihr Modell von /sd/ped.espdl
+  #undef USE_ETHERNET               // die Kamera hat kein LAN
+  #undef USE_WT32_ETH01
+  #undef OTA_URL                    // nie auf das S3-TC-Image ohne Kamera updaten
+  #define OTA_URL "https://raw.githubusercontent.com/ottelo9/tasmota-sml-images/main/ota_firmware/ESP32/tasmota32s3_dfr1154.bin"
+#endif
+
+#endif // TASMOTA OTTELO
+
 
 #endif  // _USER_CONFIG_OVERRIDE_H_
