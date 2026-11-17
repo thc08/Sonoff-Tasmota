@@ -26,8 +26,7 @@ jobs:
 
       - name: Display des POW Elite einschalten
         run: |
-          printf '\n#undef USE_TM1621_SONOFF\n#define USE_TM1621_SONOFF\n' >> tasmota/user_config_override.h
-
+          printf '\n#undef USE_DISPLAY_TM1621_SONOFF\n#define USE_DISPLAY_TM1621_SONOFF\n' >> tasmota/user_config_override.h
       - name: Python einrichten
         uses: actions/setup-python@v5
         with:
