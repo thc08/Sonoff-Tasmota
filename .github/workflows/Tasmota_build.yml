@@ -20,9 +20,9 @@ jobs:
       fail-fast: false
       matrix:
         environment:
-          - tasmota32-ottelo-pow-slim
+          - tasmota32-ottelo-tc
     steps:
-      - name: Checkout this branch only
+      - name: Checkout development branch
         uses: actions/checkout@v4
 
       - name: Set up Python
@@ -41,8 +41,7 @@ jobs:
           python -m pip show platformio || true
           python -m pip show pioarduino || true
 
-      - name: Verify resolved POW Slim build configuration
-        if: matrix.environment == 'tasmota32-ottelo-pow-slim'
+      - name: Verify resolved original Otello TC configuration
         run: |
           pio project config --json-output > /tmp/pio-project-config.json
           python - <<'PY'
@@ -51,56 +50,22 @@ jobs:
 
           config = json.loads(Path("/tmp/pio-project-config.json").read_text())
           rendered = json.dumps(config, sort_keys=True)
-          required = ("-DUSE_CONFIG_OVERRIDE", "-DFIRMWARE_TASMOTA32", "-DOTTELLO_POW_SLIM", "tasmota32-ottelo-pow-slim.bin", "esp32_partition_app1856k_fs1344k.csv", "CONFIG_BT_DISABLED=y", "CONFIG_BT_NIMBLE_DISABLED=y", "CONFIG_BT_CONTROLLER_DISABLED=y")
-          missing = [flag for flag in required if flag not in rendered]
+          required = (
+              "-DFIRMWARE_TASMOTA32",
+              "-DTASMOTA32_OTTELO",
+              "-DOTTELO_VARIANT_TC",
+              "esp32_partition_app1856k_fs1344k.csv",
+          )
+          missing = [item for item in required if item not in rendered]
           if missing:
-              raise SystemExit("Resolved PlatformIO configuration is missing: " + ", ".join(missing))
+              raise SystemExit("Resolved original Otello TC configuration is missing: " + ", ".join(missing))
           if "\\\\${env:tasmota32_base.build_flags}" in rendered or "\\${env:tasmota32_base.build_flags}" in rendered:
               raise SystemExit("PlatformIO left the base build_flags interpolation unresolved")
-          print("Resolved PlatformIO config contains the ESP32 target, POW Slim profile, OTA URL, TinyC 4 MB partition layout and disabled Bluetooth/NimBLE.")
-          PY
-
-      - name: Verify resolved full Otello TC no-SML configuration
-        if: matrix.environment == 'tasmota32-ottelo-tc-nosml'
-        run: |
-          pio project config --json-output > /tmp/pio-project-config.json
-          python - <<'PY'
-          import json
-          from pathlib import Path
-
-          config = json.loads(Path("/tmp/pio-project-config.json").read_text())
-          rendered = json.dumps(config, sort_keys=True)
-          required = ("-DUSE_CONFIG_OVERRIDE", "-DOTTELLO_TC_NOSML", "-DFIRMWARE_TASMOTA32")
-          missing = [flag for flag in required if flag not in rendered]
-          if missing:
-              raise SystemExit("Resolved Otello TC no-SML configuration is missing: " + ", ".join(missing))
-          if "\\\\${env:tasmota32_base.build_flags}" in rendered or "\\${env:tasmota32_base.build_flags}" in rendered:
-              raise SystemExit("PlatformIO left the base build_flags interpolation unresolved")
-          print("Resolved full Otello TC no-SML configuration is active.")
+          print("Resolved original Otello TC profile and original TinyC partition layout.")
           PY
 
       - name: Build firmware
         run: pio run -e ${{ matrix.environment }}
-
-      - name: Collect POW Slim linker diagnostics
-        if: matrix.environment == 'tasmota32-ottelo-pow-slim'
-        run: |
-          test -s .pio/build/tasmota32-ottelo-pow-slim/firmware.elf
-          test -s .pio/build/tasmota32-ottelo-pow-slim/firmware.map
-          test -s tasmota/tasmota_defines_for_berry.h
-          mkdir -p build_output/pow-slim-debug
-          cp .pio/build/tasmota32-ottelo-pow-slim/firmware.elf build_output/pow-slim-debug/
-          cp .pio/build/tasmota32-ottelo-pow-slim/firmware.map build_output/pow-slim-debug/
-          cp tasmota/tasmota_defines_for_berry.h build_output/pow-slim-debug/
-
-      - name: Upload POW Slim debug diagnostics
-        if: matrix.environment == 'tasmota32-ottelo-pow-slim'
-        uses: actions/upload-artifact@v4
-        with:
-          name: pow-slim-debug
-          path: build_output/pow-slim-debug/**
-          if-no-files-found: error
-          retention-days: 14
 
       - name: Upload firmware artifacts
         uses: actions/upload-artifact@v4
