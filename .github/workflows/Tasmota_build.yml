@@ -49,7 +49,10 @@ jobs:
           from pathlib import Path
 
           config = json.loads(Path("/tmp/pio-project-config.json").read_text())
-          rendered = json.dumps(config, sort_keys=True)
+          target = next((entry for entry in config if entry and entry[0] == "env:tasmota32-ottelo-tc"), None)
+          if target is None:
+              raise SystemExit("Target environment env:tasmota32-ottelo-tc was not resolved")
+          rendered = json.dumps(target, sort_keys=True)
           required = (
               "-DOTA_URL=",
               "-DTASMOTA32_OTTELO",
@@ -59,8 +62,8 @@ jobs:
           missing = [item for item in required if item not in rendered]
           if missing:
               raise SystemExit("Resolved original Otello TC configuration is missing: " + ", ".join(missing))
-          if "\\\\${env:tasmota32_base.build_flags}" in rendered or "\\${env:tasmota32_base.build_flags}" in rendered:
-              raise SystemExit("PlatformIO left the base build_flags interpolation unresolved")
+          if "\\\\${env:tasmota_ottelo_base.build_flags}" in rendered or "\\${env:tasmota_ottelo_base.build_flags}" in rendered:
+              raise SystemExit("PlatformIO left the original Otello build_flags interpolation unresolved")
           if "-DFIRMWARE_TASMOTA32" in rendered:
               raise SystemExit("Unexpected generic FIRMWARE_TASMOTA32 flag in original Otello profile")
           print("Resolved original Otello TC profile, feature flags and TinyC partition layout.")
