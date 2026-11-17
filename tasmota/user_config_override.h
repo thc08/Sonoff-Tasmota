@@ -344,7 +344,8 @@
   #ifndef USE_CSE7766
     #define USE_CSE7766
   #endif
-  #define USE_DISPLAY_TM1621_SONOFF
+  #define USE_DISPLAY             // Display-Framework aktivieren (Menue/Display-Unterstuetzung)
+  #define USE_DISPLAY_TM1621_SONOFF // Sonoff POWR316D/POW Elite TM1621-Segmentdisplay
 
   //-- TinyC VM + selbstgehostete Browser-IDE
   //-- https://github.com/gemu2015/Sonoff-Tasmota/tree/universal/tasmota/tinyc
