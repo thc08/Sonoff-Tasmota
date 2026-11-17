@@ -392,10 +392,16 @@
 
   //-- Nur benoetigte Hardwaretreiber: BL0942-Energiemessung + TM1621-Display.
   //-- Der POWR316D nutzt BL0942 (nicht CSE7766).
-  #define USE_ENERGY_SENSOR
-  #define USE_BL09XX
+  #ifndef USE_ENERGY_SENSOR
+    #define USE_ENERGY_SENSOR
+  #endif
+  #ifndef USE_BL09XX
+    #define USE_BL09XX
+  #endif
   #undef USE_CSE7766
-  #define USE_DISPLAY_TM1621_SONOFF
+  #ifndef USE_DISPLAY_TM1621_SONOFF
+    #define USE_DISPLAY_TM1621_SONOFF
+  #endif
 
   //-- Schlankes Geraeteprofil: keine ungenutzten Sensoren, Meter oder Netzwerkdienste.
   #undef USE_SML_M
@@ -422,7 +428,7 @@
   #define USE_TINYC_IDE
 
   //-- Generisches TinyC-Beispiel-Repository statt des SML-spezifischen Otello-Repos.
-  #define TINYC_DEFAULT_REPO    "https://raw.githubusercontent.com/gemu2015/Sonoff-Tasmota/universal/tasmota/tinyc"
+  #define TINYC_DEFAULT_REPO    "https://raw.githubusercontent.com/gemu2015/Sonoff-Tasmota/universal/tasmota/tinyc/bytecode"
   #define TINYC_DEFAULT_IDE_URL "https://raw.githubusercontent.com/gemu2015/Sonoff-Tasmota/universal/tasmota/tinyc/tinyc_ide.html.gz"
   #define TINYC_REPO_LIST \\
     "TinyC Examples (gemu2015)|https://raw.githubusercontent.com/gemu2015/Sonoff-Tasmota/universal/tasmota/tinyc"
