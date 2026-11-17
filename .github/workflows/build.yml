@@ -36,6 +36,12 @@ jobs:
       - name: PlatformIO installieren
         run: pip install platformio
 
+      - name: SCons-Version festlegen
+        run: |
+          pio --version
+          pip install uv
+          uv pip install --python ~/.platformio/penv/bin/python "scons==4.8.1"
+
       - name: Safeboot bauen
         run: pio run -e tasmota32-safeboot
 
