@@ -334,6 +334,16 @@
   //--  beide Varianten. Im TC-Build wird es fuer die TinyC-mscr-Opcodes SML_BAUD/
   //--  SML_HEX gebraucht, da hier kein Scripter es automatisch setzt.)
 
+  //-- Sonoff POW Elite (POWR316D/POWR320D): Energiemessung + Segmentdisplay
+  //-- CSE7766 ist in my_user_config.h standardmaessig aktiv; hier explizit absichern.
+  #ifndef USE_ENERGY_SENSOR
+    #define USE_ENERGY_SENSOR
+  #endif
+  #ifndef USE_CSE7766
+    #define USE_CSE7766
+  #endif
+  #define USE_DISPLAY_TM1621_SONOFF
+
   //-- TinyC VM + selbstgehostete Browser-IDE
   //-- https://github.com/gemu2015/Sonoff-Tasmota/tree/universal/tasmota/tinyc
   #define USE_TINYC          //Enable TinyC VM (XDRV_124)
