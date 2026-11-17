@@ -391,15 +391,15 @@
 //=============================================================================
 #ifdef OTTELO_VARIANT_POW_SLIM
 
-  //-- Nur benoetigte Hardwaretreiber: BL0942-Energiemessung + TM1621-Display.
-  //-- Der POWR316D nutzt BL0942 (nicht CSE7766).
+  //-- Nur benoetigte Hardwaretreiber: CSE7766-Energiemessung + TM1621-Display.
+  //-- POWR316D (16 A) und POWR320D (20 A) verwenden CSE7766.
   #ifndef USE_ENERGY_SENSOR
     #define USE_ENERGY_SENSOR
   #endif
-  #ifndef USE_BL09XX
-    #define USE_BL09XX
+  #ifndef USE_CSE7766
+    #define USE_CSE7766
   #endif
-  #undef USE_CSE7766
+  #undef USE_BL09XX
   #ifndef USE_DISPLAY_TM1621_SONOFF
     #define USE_DISPLAY_TM1621_SONOFF
   #endif
