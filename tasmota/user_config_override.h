@@ -430,7 +430,7 @@
   //-- Generisches TinyC-Beispiel-Repository statt des SML-spezifischen Otello-Repos.
   #define TINYC_DEFAULT_REPO    "https://raw.githubusercontent.com/gemu2015/Sonoff-Tasmota/universal/tasmota/tinyc/bytecode"
   #define TINYC_DEFAULT_IDE_URL "https://raw.githubusercontent.com/gemu2015/Sonoff-Tasmota/universal/tasmota/tinyc/tinyc_ide.html.gz"
-  #define TINYC_REPO_LIST \\
+  #define TINYC_REPO_LIST \
     "TinyC Examples (gemu2015)|https://raw.githubusercontent.com/gemu2015/Sonoff-Tasmota/universal/tasmota/tinyc"
 
 #endif // OTTELO_VARIANT_POW_SLIM
