@@ -1,0 +1,49 @@
+name: Build Ottelo ESP32 TC
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fork holen
+        uses: actions/checkout@v4
+
+      - name: Ottelos Rezept holen
+        uses: actions/checkout@v4
+        with:
+          repository: ottelo9/tasmota-sml-images
+          path: overlay
+
+      - name: Rezept anwenden
+        run: |
+          cp -f overlay/tasmota/user_config_override.h tasmota/user_config_override.h
+          cp -f overlay/platformio_tasmota_cenv.ini .
+          cp -f overlay/platformio_tasmota32.ini .
+          cp -f overlay/ccache_wrapper.py .
+          cp -rf overlay/boards/. boards/
+
+      - name: Display des POW Elite einschalten
+        run: |
+          printf '\n#undef USE_TM1621_SONOFF\n#define USE_TM1621_SONOFF\n' >> tasmota/user_config_override.h
+
+      - name: Python einrichten
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: PlatformIO installieren
+        run: pip install platformio
+
+      - name: Safeboot bauen
+        run: pio run -e tasmota32-safeboot
+
+      - name: Image bauen
+        run: pio run -e tasmota32_ottelo_tc
+
+      - name: Ergebnis bereitstellen
+        uses: actions/upload-artifact@v4
+        with:
+          name: otello-image
+          path: build_output/firmware/
