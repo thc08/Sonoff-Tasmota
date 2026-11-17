@@ -158,14 +158,15 @@
 // (3) Aktivierte zusätzliche Features (SML, Scripter ODER TinyC, TCP, Ethernet, ...)
 
 //-- Variant-Selektoren (gesetzt via build_flags in platformio_tasmota_cenv.ini):
-//--   -DOTTELO_VARIANT_TAS → klassischer Tasmota-Scripter
-//--   -DOTTELO_VARIANT_TC  → TinyC VM + Browser-IDE (KEIN Scripter)
-//-- ESP8266 (1M alle Varianten + 4M) haben nur _tas; TinyC (_tc) nur auf ESP32.
-#if !defined(OTTELO_VARIANT_TAS) && !defined(OTTELO_VARIANT_TC)
-  #error "OTTELO_VARIANT_TAS oder OTTELO_VARIANT_TC muss in build_flags gesetzt sein"
+//--   -DOTTELO_VARIANT_TAS      → klassischer Tasmota-Scripter
+//--   -DOTTELO_VARIANT_TC       → Original TinyC VM + Browser-IDE (mit SML/Matter)
+//--   -DOTTELO_VARIANT_POW_SLIM → POWR316D TinyC Slim (ohne SML/DS18x20)
+//-- ESP8266 hat nur _tas; TinyC-Varianten sind fuer ESP32.
+#if !defined(OTTELO_VARIANT_TAS) && !defined(OTTELO_VARIANT_TC) && !defined(OTTELO_VARIANT_POW_SLIM)
+  #error "Eine Otello-Variante (TAS, TC oder POW_SLIM) muss in build_flags gesetzt sein"
 #endif
-#if defined(OTTELO_VARIANT_TAS) && defined(OTTELO_VARIANT_TC)
-  #error "OTTELO_VARIANT_TAS und OTTELO_VARIANT_TC schliessen sich gegenseitig aus"
+#if (defined(OTTELO_VARIANT_TAS) + defined(OTTELO_VARIANT_TC) + defined(OTTELO_VARIANT_POW_SLIM)) != 1
+  #error "Otello-Varianten TAS, TC und POW_SLIM schliessen sich gegenseitig aus"
 #endif
 
 //-- Stack size erhöhen (Empfehlung: seit Core3 wird mehr benötigt)
@@ -185,15 +186,14 @@
   #endif
 #endif
 
-//-- SML (in beiden Varianten — beim _tc liegt der Meter-Descriptor unter /sml_meter.def)
-#define USE_SML_M
-#define USE_SML_CRC       //enables CRC support for binary SML. Must still be enabled via line like "1,=soC,1024,15". https://tasmota.github.io/docs/Smart-Meter-Interface/#special-commands
-#define USE_SML_AUTHKEY   //selten genutzt, M,=so5
-//-- SML-Script-Cmds (SML_SetBaud / SML_Write / SML_SetOptions, sml[X]-Zugriff).
-//-- Im TAS-Build wuerde xdrv_10_scripter.ino das eh automatisch setzen, im TC-Build
-//-- (kein Scripter) nicht. Daher hier gemeinsam fuer BEIDE explizit definiert —
-//-- der Scripter macht im TAS-Build #undef+#define (idempotent, kein Konflikt).
-#define USE_SML_SCRIPT_CMD
+//-- SML bleibt in den bisherigen TAS- und Original-TC-Varianten erhalten.
+//-- Die POW-Slim-Variante ist bewusst vollstaendig ohne SML.
+#ifndef OTTELO_VARIANT_POW_SLIM
+  #define USE_SML_M
+  #define USE_SML_CRC
+  #define USE_SML_AUTHKEY
+  #define USE_SML_SCRIPT_CMD
+#endif
 
 //-- Home Assistant + HTTPS-Client (gemeinsam)
 #define USE_HOME_ASSISTANT  //HA API (+12k code, +6 bytes mem)
@@ -202,13 +202,15 @@
 
 //-- Software Serial / MQTT-TLS / InfluxDB — nur ESP32 (gemeinsam _tas + _tc)
 #if ( !defined(TASMOTA1M_OTTELO) && !defined(TASMOTA4M_OTTELO) && !defined(TASMOTA1M_ENERGY_OTTELO) && !defined(TASMOTA1M_SHELLY_OTTELO) )
-  #define USE_ESP32_SW_SERIAL //Pin mit '-' in der SML/TinyC Konfiguration definieren
-  #define USE_MQTT_TLS        //3KB
-  #define USE_INFLUXDB        //6KB
+  #ifndef OTTELO_VARIANT_POW_SLIM
+    #define USE_ESP32_SW_SERIAL //Pin mit '-' in der SML/TinyC Konfiguration definieren
+    #define USE_INFLUXDB        //6KB
+  #endif
+  #define USE_MQTT_TLS          //3KB
 #endif
 
 //-- Ethernet (WT32-ETH01) - gemeinsam
-#if ( defined(TASMOTA32_OTTELO) || defined(TASMOTA32SOLO1_OTTELO) || defined(TASMOTA32S3_OTTELO) || defined(TASMOTA32P4_OTTELO) || defined(TASMOTA32P4R3_OTTELO) )
+#if ( (defined(TASMOTA32_OTTELO) || defined(TASMOTA32SOLO1_OTTELO) || defined(TASMOTA32S3_OTTELO) || defined(TASMOTA32P4_OTTELO) || defined(TASMOTA32P4R3_OTTELO)) && !defined(OTTELO_VARIANT_POW_SLIM) )
   #define USE_ETHERNET          //Add support for ethernet (+20k code)
   #define USE_WT32_ETH01
   #define ETH_TYPE          0
@@ -383,6 +385,51 @@
 #endif // OTTELO_VARIANT_TC
 
 
+//=============================================================================
+// POWR316D TinyC Slim — Sonoff POW Elite 16A
+//=============================================================================
+#ifdef OTTELO_VARIANT_POW_SLIM
+
+  //-- Nur benoetigte Hardwaretreiber: BL0942-Energiemessung + TM1621-Display.
+  //-- Der POWR316D nutzt BL0942 (nicht CSE7766).
+  #define USE_ENERGY_SENSOR
+  #define USE_BL09XX
+  #undef USE_CSE7766
+  #define USE_DISPLAY_TM1621_SONOFF
+
+  //-- Schlankes Geraeteprofil: keine ungenutzten Sensoren, Meter oder Netzwerkdienste.
+  #undef USE_SML_M
+  #undef USE_SML_CRC
+  #undef USE_SML_AUTHKEY
+  #undef USE_SML_SCRIPT_CMD
+  #undef USE_DS18x20
+  #undef USE_BMP
+  #undef USE_DHT
+  #undef USE_INFLUXDB
+  #undef USE_ESP32_SW_SERIAL
+  #undef USE_ETHERNET
+  #undef USE_WT32_ETH01
+  #undef USE_MATTER_C
+  #undef USE_MATTER_C_PLUGIN_ONLY
+  #undef USE_DISCOVERY
+  #undef WEBSERVER_ADVERTISE
+  #undef USE_RULES
+
+  //-- TinyC VM, Browser-IDE und nachladbare BinPlugins bleiben verfuegbar.
+  #define USE_BINPLUGINS
+  #define USE_TINYC_REPO_IDE
+  #define USE_TINYC
+  #define USE_TINYC_IDE
+
+  //-- Generisches TinyC-Beispiel-Repository statt des SML-spezifischen Otello-Repos.
+  #define TINYC_DEFAULT_REPO    "https://raw.githubusercontent.com/gemu2015/Sonoff-Tasmota/universal/tasmota/tinyc"
+  #define TINYC_DEFAULT_IDE_URL "https://raw.githubusercontent.com/gemu2015/Sonoff-Tasmota/universal/tasmota/tinyc/tinyc_ide.html.gz"
+  #define TINYC_REPO_LIST \\
+    "TinyC Examples (gemu2015)|https://raw.githubusercontent.com/gemu2015/Sonoff-Tasmota/universal/tasmota/tinyc"
+
+#endif // OTTELO_VARIANT_POW_SLIM
+
+
 //-- Weiteres optionales
 //#define USE_DISPLAY_TM1621_SONOFF //4KB
 //#define USE_SENDMAIL
@@ -401,7 +448,11 @@
 #endif
 
 #if defined(TASMOTA32_OTTELO)
-  #define OTA_URL "https://raw.githubusercontent.com/ottelo9/tasmota-sml-images/main/ota_firmware/ESP32/tasmota32_ottelo" _OTTELO_SFX ".bin"
+  #ifdef OTTELO_VARIANT_POW_SLIM
+    #define OTA_URL "Kein automatisches OTA-Ziel fuer POW Slim definiert"
+  #else
+    #define OTA_URL "https://raw.githubusercontent.com/ottelo9/tasmota-sml-images/main/ota_firmware/ESP32/tasmota32_ottelo" _OTTELO_SFX ".bin"
+  #endif
 #elif defined(TASMOTA32C3_OTTELO)
   #define OTA_URL "https://raw.githubusercontent.com/ottelo9/tasmota-sml-images/main/ota_firmware/ESP32/tasmota32c3_ottelo" _OTTELO_SFX ".bin"
 #elif defined(TASMOTA32C6_OTTELO)

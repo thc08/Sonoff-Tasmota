@@ -21,6 +21,7 @@ jobs:
       matrix:
         environment:
           - tasmota32-ottelo-tc
+          - tasmota32-ottelo-pow-slim
     steps:
       - name: Checkout development branch
         uses: actions/checkout@v4
@@ -41,7 +42,7 @@ jobs:
           python -m pip show platformio || true
           python -m pip show pioarduino || true
 
-      - name: Verify resolved original Otello TC configuration
+      - name: Verify resolved Otello TC and POW Slim configurations
         run: |
           pio project config --json-output > /tmp/pio-project-config.json
           python - <<'PY'
@@ -49,24 +50,24 @@ jobs:
           from pathlib import Path
 
           config = json.loads(Path("/tmp/pio-project-config.json").read_text())
-          target = next((entry for entry in config if entry and entry[0] == "env:tasmota32-ottelo-tc"), None)
-          if target is None:
-              raise SystemExit("Target environment env:tasmota32-ottelo-tc was not resolved")
-          rendered = json.dumps(target, sort_keys=True)
-          required = (
-              "-DOTA_URL=",
-              "-DTASMOTA32_OTTELO",
-              "-DOTTELO_VARIANT_TC",
-              "esp32_partition_app1856k_fs1344k.csv",
-          )
-          missing = [item for item in required if item not in rendered]
-          if missing:
-              raise SystemExit("Resolved original Otello TC configuration is missing: " + ", ".join(missing))
-          if "\\\\${env:tasmota_ottelo_base.build_flags}" in rendered or "\\${env:tasmota_ottelo_base.build_flags}" in rendered:
-              raise SystemExit("PlatformIO left the original Otello build_flags interpolation unresolved")
-          if "-DFIRMWARE_TASMOTA32" in rendered:
-              raise SystemExit("Unexpected generic FIRMWARE_TASMOTA32 flag in original Otello profile")
-          print("Resolved original Otello TC profile, feature flags and TinyC partition layout.")
+          profiles = {
+              "env:tasmota32-ottelo-tc": ("-DTASMOTA32_OTTELO", "-DOTTELO_VARIANT_TC"),
+              "env:tasmota32-ottelo-pow-slim": ("-DTASMOTA32_OTTELO", "-DOTTELO_VARIANT_POW_SLIM"),
+          }
+          for name, flags in profiles.items():
+              target = next((entry for entry in config if entry and entry[0] == name), None)
+              if target is None:
+                  raise SystemExit(f"Target environment {name} was not resolved")
+              rendered = json.dumps(target, sort_keys=True)
+              required = ("-DOTA_URL=", *flags, "esp32_partition_app1856k_fs1344k.csv")
+              missing = [item for item in required if item not in rendered]
+              if missing:
+                  raise SystemExit(f"{name} is missing: " + ", ".join(missing))
+              if "\\\\${env:tasmota_ottelo_base.build_flags}" in rendered or "\\${env:tasmota_ottelo_base.build_flags}" in rendered:
+                  raise SystemExit(f"{name}: unresolved build_flags interpolation")
+              if "-DFIRMWARE_TASMOTA32" in rendered:
+                  raise SystemExit(f"{name}: unexpected generic FIRMWARE_TASMOTA32 flag")
+              print(f"Resolved {name} with the expected variant flags and TinyC partition layout.")
           PY
 
       - name: Build firmware
