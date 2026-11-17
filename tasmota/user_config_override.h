@@ -403,6 +403,7 @@
   #ifndef USE_DISPLAY_TM1621_SONOFF
     #define USE_DISPLAY_TM1621_SONOFF
   #endif
+  #define USE_DISPLAY             // Nur die benoetigte Display-Unterstuetzung fuer POWR316D
 
   //-- Schlankes Geraeteprofil: keine ungenutzten Sensoren, Meter oder Netzwerkdienste.
   #undef USE_SML_M
