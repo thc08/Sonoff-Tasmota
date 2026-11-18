@@ -2,6 +2,9 @@ name: Build Ottelo ESP32 TC
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - test/otello-tc-build-2026-11-18
 
 jobs:
   build:
@@ -27,6 +30,7 @@ jobs:
       - name: Display des POW Elite einschalten
         run: |
           printf '\n#undef USE_DISPLAY_TM1621_SONOFF\n#define USE_DISPLAY_TM1621_SONOFF\n' >> tasmota/user_config_override.h
+
       - name: Python einrichten
         uses: actions/setup-python@v5
         with:
@@ -34,7 +38,7 @@ jobs:
 
       - name: PlatformIO installieren
         run: pip install "platformio<6.2.0"
-  
+
       - name: Safeboot bauen
         run: |
           pio run -e tasmota32-safeboot
