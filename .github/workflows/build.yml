@@ -1,0 +1,61 @@
+name: Build Ottelo ESP32 TC
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fork holen
+        uses: actions/checkout@v4
+
+      - name: Ottelos Rezept holen
+        uses: actions/checkout@v4
+        with:
+          repository: ottelo9/tasmota-sml-images
+          path: overlay
+
+      - name: Rezept anwenden
+        run: |
+          cp -f overlay/tasmota/user_config_override.h tasmota/user_config_override.h
+          cp -f overlay/platformio_tasmota_cenv.ini .
+          cp -f overlay/platformio_tasmota32.ini .
+          cp -f overlay/ccache_wrapper.py .
+          cp -rf overlay/boards/. boards/
+
+      - name: Display des POW Elite einschalten
+        run: |
+          printf '\n#undef USE_DISPLAY_TM1621_SONOFF\n#define USE_DISPLAY_TM1621_SONOFF\n' >> tasmota/user_config_override.h
+      - name: Python einrichten
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: PlatformIO installieren
+        run: pip install "platformio<6.2.0"
+  
+      - name: Safeboot bauen
+        run: |
+          pio run -e tasmota32-safeboot
+          echo "--- gefundene Safeboot-Dateien ---"
+          find . -name "*safeboot*.bin" -not -path "./.pio/libdeps/*" | head -50
+          mkdir -p build_output/firmware variants/tasmota
+          for f in build_output/firmware/tasmota32-safeboot.bin variants/tasmota/tasmota32-safeboot.bin; do
+            if [ -f "$f" ]; then
+              cp "$f" build_output/firmware/tasmota32_ottelo_tc-safeboot.bin
+              cp "$f" variants/tasmota/tasmota32_ottelo_tc-safeboot.bin
+            fi
+          done
+
+      - name: Image bauen
+        run: pio run -e tasmota32_ottelo_tc
+
+      - name: Ergebnis bereitstellen
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: otello-image
+          path: |
+            build_output/firmware/
+            .pio/build/tasmota32_ottelo_tc/firmware.bin
