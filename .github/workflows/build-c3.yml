@@ -17,7 +17,7 @@ jobs:
         with:
           repository: ottelo9/tasmota-sml-images
           path: overlay
-
+          
       - name: Rezept anwenden
         run: |
           echo "--- Inhalt von Ottelos Repo ---"
@@ -28,10 +28,14 @@ jobs:
             echo "Kopiere $(basename "$f")"
             cp -f "$f" .
           done
-          if [ -d overlay/boards ]; then cp -rf overlay/boards/. boards/; fi
-          if [ -d overlay/partitions ]; then mkdir -p partitions; cp -rn overlay/partitions/. partitions/; fi
-          if [ -d overlay/pio-tools ]; then mkdir -p pio-tools; cp -rn overlay/pio-tools/. pio-tools/;     
-
+          for d in boards partitions pio-tools; do
+            if [ -d "overlay/$d" ]; then
+              echo "Kopiere Ordner $d"
+              mkdir -p "$d"
+              cp -rn "overlay/$d/." "$d/"
+            fi
+          done
+          
       - name: Speicher-C3 Anpassungen
         run: |
           cat >> tasmota/user_config_override.h <<'EOF'
