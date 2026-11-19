@@ -20,12 +20,18 @@ jobs:
 
       - name: Rezept anwenden
         run: |
+          echo "--- Inhalt von Ottelos Repo ---"
+          ls -la overlay
           cp -f overlay/tasmota/user_config_override.h tasmota/user_config_override.h
-          cp -f overlay/platformio_tasmota_cenv.ini .
-          cp -f overlay/platformio_tasmota32.ini .
-          cp -f overlay/ccache_wrapper.py .
-          cp -rf overlay/boards/. boards/
-
+          for f in platformio_tasmota_cenv.ini platformio_tasmota32.ini ccache_wrapper.py; do
+            if [ -f "overlay/$f" ]; then
+              cp -f "overlay/$f" .
+            else
+              echo "Hinweis: $f gibt es bei Ottelo nicht, wird uebersprungen"
+            fi
+          done
+          if [ -d overlay/boards ]; then cp -rf overlay/boards/. boards/; fi
+          
       - name: Speicher-C3 Anpassungen
         run: |
           cat >> tasmota/user_config_override.h <<'EOF'
