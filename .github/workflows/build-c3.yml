@@ -61,4 +61,46 @@ jobs:
 
       - name: PlatformIO installieren
         run: |
-          pip install "platformio==6.2.0" || pip install "platformio>=6.2.1" || pip
+          pip install "platformio==6.2.0" || pip install "platformio>=6.2.1" || pip install -U --pre platformio
+          pio --version
+
+      - name: Safeboot bauen
+        run: |
+          pio run -e tasmota32c3-safeboot
+          echo "--- gefundene Safeboot-Dateien ---"
+          find . -name "*safeboot*.bin" -not -path "./.pio/libdeps/*" | head -50
+          mkdir -p build_output/firmware variants/tasmota
+          for f in build_output/firmware/tasmota32c3-safeboot.bin variants/tasmota/tasmota32c3-safeboot.bin; do
+            if [ -f "$f" ]; then
+              cp "$f" build_output/firmware/tasmota32c3_ottelo_tc-safeboot.bin
+              cp "$f" variants/tasmota/tasmota32c3_ottelo_tc-safeboot.bin
+            fi
+          done
+
+      - name: Image bauen
+        run: pio run -e "$UMGEBUNG"
+
+      - name: Firmware suchen
+        if: always()
+        run: |
+          echo "--- build_output/firmware ---"
+          ls -la build_output/firmware || true
+          echo "--- .pio/build ---"
+          ls -la ".pio/build/$UMGEBUNG" | head -40 || true
+          echo "--- alle ottelo-bin ---"
+          find . -name "*ottelo*.bin" -not -path "./overlay/*" | head -30
+
+      - name: Datum merken
+        if: always()
+        run: echo "DATUM=$(date +%Y-%m-%d_%H%M)" >> "$GITHUB_ENV"
+
+      - name: Ergebnis bereitstellen
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: speicher-c3-tc-${{ env.DATUM }}
+          include-hidden-files: true
+          if-no-files-found: error
+          path: |
+            build_output/firmware/
+            .pio/build/tasmota32c3_ottelo_tc/firmware.bin
