@@ -59,9 +59,9 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: PlatformIO installieren
+       - name: PlatformIO installieren
         run: |
-          pip install "platformio==6.2.0" || pip install -U platformio
+          pip install "platformio==6.2.0" || pip install "platformio>=6.2.1" || pip install -U --pre platformio
           pio --version
           
       - name: Safeboot bauen
