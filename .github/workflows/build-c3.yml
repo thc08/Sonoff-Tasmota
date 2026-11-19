@@ -61,9 +61,9 @@ jobs:
 
       - name: PlatformIO installieren
         run: |
-          pip install -U platformio
+          pip install "platformio==6.2.0" || pip install -U platformio
           pio --version
-
+          
       - name: Safeboot bauen
         run: |
           pio run -e tasmota32c3-safeboot
