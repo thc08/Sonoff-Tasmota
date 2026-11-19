@@ -5,18 +5,22 @@
 //
 //   http://<ip>/rover        joystick page (touch or mouse; arrow keys / WASD)
 //   http://<ip>/rover_cmd?d=<-100..100>&t=<-100..100>&m=<10..100>   one drive command, answers a small JSON
-//   console:  RoverEnc [0|1], RoverEncZero, RoverEncCal <mm>, RoverEncTpr <n>, RoverCalGyro, RoverYaw0, RoverCalMag 1|0, RoverCliff [0|1|<min> <max>], RoverPark [0|1], RoverTof <ch> <mm> (-1 = silent sensor), RoverVbat <mV>
+//   console:  RoverEnc [0|1], RoverEncZero, RoverEncCal <mm>, RoverEncTpr <n>, RoverCalGyro, RoverYaw0, RoverCalMag 1|0, RoverCliff [0|1|<min> <max>], RoverObst [0|1|<mm>], RoverWander [<seconds>|0], RoverPark [0|1], RoverTof <ch> <mm> (-1 = silent sensor), RoverVbat <mV>
 //
 // SAFETY, in the order it matters:
-//  1. STAIRCASE: four VL53L0X floor sensors (TCA9548A channels 0..3 = front left, front right, rear left, rear right, looking
+//  1. STAIRCASE: four VL53L0X floor sensors (TCA9548A channels 0..3 = rear left, rear right, front right, front left (as wired on gemu's rover, 17.11.2026), looking
 //     outward / down about 45 degrees). A sensor sees the floor when its distance is inside the window cl_min..cl_max (mm). A reading
 //     outside it (nothing returned = a drop) or a sensor that is missing / silent for CLIFF_STALE_MS counts as a CLIFF. Then:
 //     front cliff -> only straight reverse, rear cliff -> only straight forward, both (or a sensor fault) -> no movement at all.
 //     This runs in this program, independent of anything that sends commands. RoverCliff 0 switches the protection off (log warning).
+//  1b. OBSTACLE BRAKE (lidar, ROVER_LIDAR 1): ahead = lidar 240..300 deg, behind = 60..120 (measured with a hand in front of the nose). An echo closer than
+//     OBST_MM (250 mm, released at +50) refuses driving toward it; turning stays free; a silent lidar holds the motors (RoverObst 0 = off). d > 0 drives toward
+//     the NOSE (the end with FL / FR); the encoder ticks count negative for forward. Checked on the rover 17.11.2026: brake at 250 mm, stood at 236 mm
+//     (40 %, 0.17 m/s); the staircase guard on a table edge in front and behind.
 //  2. DEAD-MAN: a drive command must be renewed within WD_MS (300 ms), else the motors stop. The page sends one every 100 ms.
 //  3. Battery guard: below VBAT_MIN_MV the motors are refused (3S Li-ion, INA219 at 0x42).
 //  4. A slot stop (CleanUp) and the start of the program switch all motor pins off.
-//  4b. MOTOR STALL (wheel encoders, off until RoverEnc 1): a side that is commanded but gives no tick for ENC_STALL_MS stops the rover until
+//  4b. MOTOR STALL (wheel encoders, on by default since 17.11.2026, RoverEnc 0 switches it off): a side that is commanded but gives no tick for ENC_STALL_MS stops the rover until
 //     the stick is released (see common/wheel_enc.tc for wiring, counters and calibration).
 //  5. PARK MODE (RoverPark 1, or /rover_cmd?p=1): for a rover that stands still, on its charger or not. The motors are refused, the
 //     floor sensors, IMU, compass and the display are no longer served (the chips keep running, only the I2C traffic and the display
@@ -36,12 +40,23 @@
 //
 // TEST WITHOUT THE ROVER: ROVER_SIM 1 does not touch the motor pins, takes the battery voltage from RoverVbat and the four distances
 // from RoverTof (default 60 mm), so the display, the web page and the safety logic can be tried on any ESP32.
-// NOT yet tested on the rover (the I2C drivers' decoding is covered by wave_sensors_test.tc).
+// Tested on the rover 17.11.2026: floor sensors, lidar, drive, brake, joystick page (not at higher speed).
 
 #define ROVER_SIM   0            // 1 = simulated battery / floor sensors, no motor pins
-#define ROVER_LIDAR 0            // 1 = LD19 lidar on LIDAR_RX (about 10 kB RAM, a fifth of the VM time); 0 = off
-#define LIDAR_RX    27           // GPIO of the lidar TX line (IO27 = encoder channel B of the left wheel, so not with ENC_BOTH 1)
-#define ROVER_LINK  0            // 1 = UDP link: a cam module (or any program) sends drive commands to LINK_PORT, the rover answers with its status
+#define ROVER_LIDAR 1            // 1 = LD06/LD19 lidar on LIDAR_RX (about 10 kB RAM, a fifth of the VM time); 0 = off
+#define LIDAR_RX    4            // GPIO of the lidar TX line: IO4 of the 10-pin header (checked 17.11.2026; TX on IO5 stopped the lidar). IO27 would be encoder channel B
+#define OBST_MM     250          // obstacle brake: stop driving toward anything closer than this (mm); RoverObst <mm> changes it, RoverObst 0 switches it off
+#define OBST_HYST   50           // released again only at OBST_MM + this (no flicker at the edge)
+#define OBST_FRONT_A0 240        // lidar degrees of "ahead" (measured 17.11.2026: a hand in front of the nose shows at 240..299, centre 270)
+#define OBST_FRONT_A1 300
+#define OBST_REAR_A0  60         // "behind" = opposite
+#define OBST_REAR_A1  120
+#define ROVER_ESPNOW 0           // 1 = ESP-NOW link (radio, no router): a cam module sends the same text commands as the UDP link ("d=40 t=0 m=40 p=0"), the rover answers
+                                 //     with a short status. Without ESPNOW_ENC anyone in radio range can drive the rover (log line "OPEN"); with ESPNOW_ENC 1 only ESPNOW_PEER can
+#define ESPNOW_ENC   0           // 1 = encrypted (needs ESPNOW_KEY of 16 characters and the sender's MAC in ESPNOW_PEER, the sender sets the same key and lists the rover)
+#define ESPNOW_KEY   "0123456789abcdef"
+#define ESPNOW_PEER  "AA:BB:CC:DD:EE:FF"
+#define ROVER_LINK  1            // 1 = UDP link: a cam module (or any program) sends drive commands to LINK_PORT, the rover answers with its status
 #define LINK_PORT   5006
 #define DSP_EXTRA   1            // 1 = extra panel below the 4 OLED lines (TFT)
 
@@ -58,8 +73,11 @@
 #if ROVER_SIM
 #define ENC_SIM 1
 #endif
+#define ENC_STALL_MS 1500       // (800 before 18.11.2026) the speed controller needs about a second to bring a standing wheel from the minimum PWM up to its breakaway
+#define ENC_ON 1                // the stall guard is on (encoders wired 13.11.2026): a side commanded but without a tick for 800 ms stops the rover
 #include "wheel_enc.tc"
 #if ROVER_LIDAR
+#define LID_TX_PIN 13             // the lidar sends nothing: GPIO13 (SD slot MOSI, unused) is only the UART's dummy tx. With tx = -1 the UART takes GPIO17 = left motor AIN2 and the left wheel stops (found 17.11.2026)
 #include "ld19.tc"
 #endif
 
@@ -79,10 +97,11 @@
 #define VMAX_START  40
 #define INA_ADDR    0x42
 #define I2C_BUS     0
+#define TOF_BUS     0            // bus of the floor sensors' multiplexer: 0 = the board's bus (GPIO32 / 33, since 17.11.2026); 1 = the SECOND Tasmota I2C bus on GPIO4 (SDA) / GPIO5 (SCL), set with `Gpio4 641`, `Gpio5 609`
 #define VBAT_MIN_MV 9300
-#define CLIFF_MIN   25           // floor window (mm along the beam); set to your mounting with RoverCliff <min> <max>
+#define CLIFF_MIN   40           // floor window (mm along the beam); set to your mounting with RoverCliff <min> <max>. The floor reads 51..73 mm here: a low obstacle ahead shortens the reading under 40 and counts as a cliff (25 before 17.11.2026)
 #define CLIFF_MAX   110
-#define CLIFF_STALE_MS 600       // a sensor that did not answer for this long is a fault
+#define CLIFF_STALE_MS 1000      // a sensor that did not answer for this long is a fault
 #define SPD_WIN_MS  200          // speed control: the ticks of this window give the measured speed
 #define SPD_PWM_LO  5            // lowest PWM the speed controller may use
 #define SPD_PULSE_BELOW 24       // below this speed (mm/s) a wheel is driven in bursts (pulse mode), at or above it the PI controller
@@ -104,7 +123,7 @@ int motR    = 0;
 int stops   = 0;
 int vbat_mv = 0;
 int low     = 0;
-int why     = 0;                 // why the motors are held: 0 free, 1 battery, 2 sensor fault, 3 front cliff, 4 rear cliff, 5 both, 6 parked, 7 motor stall
+int why     = 0;                 // why the motors are held: 0 free, 1 battery, 2 sensor fault, 3 front cliff, 4 rear cliff, 5 both, 6 parked, 7 motor stall, 8 lidar silent, 9 obstacle ahead, 10 obstacle behind
 int park    = 0;                 // 1 = parked (see header)
 int spd_full = 0;                // RoverSpeed: mm/s at a full stick (0 = open loop)
 int spd_t0   = 0;
@@ -123,6 +142,14 @@ int cl_on   = 1;
 int cl_min  = CLIFF_MIN;
 int cl_max  = CLIFF_MAX;
 int cl_flag[4];                  // 1 = no floor in the window
+int obs_on    = 1;                // obstacle brake (RoverObst 0 = off)
+int obs_mm    = OBST_MM;
+int obs_front = 0;                // 1 = something closer than obs_mm ahead
+int obs_rear  = 0;
+int obs_fault = 0;                // 1 = the lidar sends nothing (the brake cannot see)
+int obs_df    = 0;                // nearest distance ahead / behind in mm (0 = nothing seen)
+int obs_dr    = 0;
+int wan_on    = 0;                // RoverWander is running (declared here: the links below must know it)
 int cl_front = 0;
 int cl_rear  = 0;
 int cl_fault = 1;                // 1 until all four sensors answered
@@ -233,10 +260,21 @@ void rover_apply() {
             t = 0; why = 4;
         }
     }
+    if (obs_on == 1) {
+        if (obs_fault == 1) {
+            d = 0; t = 0;
+            if (why == 0) { why = 8; }
+        } else {
+            if (obs_front == 1 && d > 0) { d = 0; if (why == 0) { why = 9; } }
+            if (obs_rear == 1 && d < 0) { d = 0; if (why == 0) { why = 10; } }
+        }
+    }
     if (enc_on == 1 && enc_stall != 0) { d = 0; t = 0; why = 7; }
     if (park == 1) { d = 0; t = 0; why = 6; }
-    l = rover_clamp(d + t, -100, 100);
-    r = rover_clamp(d - t, -100, 100);
+    // d > 0 = toward the NOSE, the end with the floor sensors FL / FR (lidar 270 degrees). The motors turn the other way for a positive
+    // value, so d is negated here (17.11.2026: a drive test took the rover AWAY from the obstacle the brake watched); turning is unchanged.
+    l = rover_clamp(t - d, -100, 100);
+    r = rover_clamp(0 - d - t, -100, 100);
     spd_pct[0] = l;
     spd_pct[1] = r;
     if (spd_full > 0) {
@@ -339,8 +377,13 @@ int spd_ctl() {
             if (a > 0 && spd_out[s] > 0.0) {
                 tg = (float)a * (float)spd_full / 100.0;
                 err = tg - spd_v[s];
-                spd_out[s] = spd_out[s] + SPD_KP * (err - spd_err[s]) + SPD_KI * err;
-                spd_err[s] = err;
+                if (spd_v[s] < 0.3 * tg && spd_out[s] < 90.0) {
+                    spd_out[s] = spd_out[s] + 12.0;      // a wheel that has not got going yet (breakaway of the tyres on tiles needs about 40..60 PWM): ramp instead of the slow PI
+                    spd_err[s] = err;
+                } else {
+                    spd_out[s] = spd_out[s] + SPD_KP * (err - spd_err[s]) + SPD_KI * err;
+                    spd_err[s] = err;
+                }
                 if (spd_out[s] < (float)SPD_PWM_LO) { spd_out[s] = (float)SPD_PWM_LO; }
                 if (spd_out[s] > 255.0) { spd_out[s] = 255.0; }
                 ch = 1;
@@ -349,6 +392,40 @@ int spd_ctl() {
         s = s + 1;
     }
     return ch;
+}
+
+// lidar obstacle brake: nearest echo ahead / behind against obs_mm; returns 1 when the picture changed (then the motors must be re-evaluated)
+int obst_eval() {
+    int f = 0;
+    int r = 0;
+    int fault = 0;
+    int df = 0;
+    int dr = 0;
+    int lf = obs_mm;
+    int lr = obs_mm;
+#if ROVER_LIDAR
+    if (lid_ok() == 0) {
+        fault = 1;
+    } else {
+        df = lid_min(OBST_FRONT_A0, OBST_FRONT_A1);
+        dr = lid_min(OBST_REAR_A0, OBST_REAR_A1);
+        if (obs_front == 1) { lf = obs_mm + OBST_HYST; }
+        if (obs_rear == 1) { lr = obs_mm + OBST_HYST; }
+        if (df > 0 && df < lf) { f = 1; }
+        if (dr > 0 && dr < lr) { r = 1; }
+    }
+#endif
+    obs_df = df;
+    obs_dr = dr;
+    if (f == obs_front && r == obs_rear && fault == obs_fault) { return 0; }
+    obs_front = f;
+    obs_rear = r;
+    obs_fault = fault;
+    return 1;
+}
+
+int obs_mask() {
+    return obs_front + obs_rear * 2 + obs_fault * 4;
 }
 
 // evaluate the four floor sensors; returns 1 when the picture changed (then the motors must be re-evaluated)
@@ -379,7 +456,7 @@ int cliff_eval() {
         if (f != cl_flag[ch]) { changed = 1; }
         cl_flag[ch] = f;
         if (f == 1) {
-            if (ch < 2) { fr = 1; } else { re = 1; }
+            if (ch >= 2) { fr = 1; } else { re = 1; }   // channels 2, 3 = front; 0, 1 = rear
         }
         ch = ch + 1;
     }
@@ -390,37 +467,69 @@ int cliff_eval() {
     return changed;
 }
 
-// one floor sensor per call (about 35 ms each on the real sensor)
+// all four floor sensors per call, without waiting (vl_service starts / collects; before 18.11.2026 ONE sensor per call, 43 ms each, so a sensor was
+// refreshed only every 600..800 ms and the cliff guard reacted after 12 cm of travel)
 void tof_step() {
-    int ch = tof_ch;
+    int ch = 0;
+    while (ch < 4) {
 #if ROVER_SIM
-    if (sim_tof[ch] >= 0) {                  // a negative value simulates a silent sensor (RoverTof <ch> -1)
-        vl_dist[ch] = sim_tof[ch];
-        vl_age[ch] = millis();
-    }
+        if (sim_tof[ch] >= 0) {                  // a negative value simulates a silent sensor (RoverTof <ch> -1)
+            vl_dist[ch] = sim_tof[ch];
+            vl_age[ch] = millis();
+        }
 #else
-    vl_poll(ch);
+        vl_service(ch);
 #endif
-    tof_ch = (ch + 1) & 3;
+        ch = ch + 1;
+    }
+}
+
+int tl_cnt = 0;
+int tl_rate = 0;
+int tl_t = 0;
+
+// the command links are polled several times per pass of TaskLoop (every step below can take 5..40 ms): the dead-man (WD_MS 300 ms) needs a command to be
+// noticed within about 50 ms, and a callback (Every50ms) gets the VM only while this loop sleeps
+void link_poll_all() {
+#if ROVER_LINK
+    lk_poll();
+#endif
+#if ROVER_ESPNOW
+    en_poll();
+#endif
+    fast_tasks();
 }
 
 void TaskLoop() {
+    tl_cnt = tl_cnt + 1;
+    if (millis() - tl_t >= 1000) { tl_rate = tl_cnt; tl_cnt = 0; tl_t = millis(); }
     if (park == 0) {
 #if ROVER_LIDAR
-        lid_poll();                  // the ring holds 200 ms: poll between the slow I2C steps
+        lid_poll();                  // the ring holds 200 ms: poll between the slow steps
 #endif
+        link_poll_all();
         tof_step();
 #if ROVER_LIDAR
         lid_poll();
 #endif
+        link_poll_all();
         if (cliff_eval() == 1) {
-            if (cl_fault == 0 && cl_on == 1) { addLog("ROVER: cliff F%d%d R%d%d", cl_flag[0], cl_flag[1], cl_flag[2], cl_flag[3]); }
+            if (cl_fault == 0 && cl_on == 1) { addLog("ROVER: cliff F%d%d R%d%d", cl_flag[3], cl_flag[2], cl_flag[0], cl_flag[1]); }
+            rover_apply();
+        }
+        if (obst_eval() == 1) {
+            if (obs_on == 1) { addLog("ROVER: obstacle ahead %d behind %d lidar fault %d (nearest %d / %d mm)", obs_front, obs_rear, obs_fault, obs_df, obs_dr); }
             rover_apply();
         }
         qmi_poll();
+        link_poll_all();
         ak_poll();
 #if ROVER_LIDAR
         lid_poll();
+#endif
+        link_poll_all();
+#if ROVER_LINK && ROVER_LIDAR
+        lk_scan();
 #endif
     }
     if (millis() >= ina_next) {
@@ -459,6 +568,9 @@ void dsp_state(char t[]) {
     else if (why == 5) { strcpy(t, "CLIFF F+R"); }
     else if (why == 6) { strcpy(t, "PARKED"); }
     else if (why == 7) { strcpy(t, "MOTOR STALL"); }
+    else if (why == 8) { strcpy(t, "LIDAR SILENT"); }
+    else if (why == 9) { strcpy(t, "OBSTACLE AHEAD"); }
+    else if (why == 10) { strcpy(t, "OBSTACLE BEHIND"); }
     else if (motL == 0 && motR == 0) { strcpy(t, "STOP"); }
     else { sprintf(t, "L%d R%d", motL, motR); }
 }
@@ -542,9 +654,9 @@ void display_update() {
         dcol(0xFFE0);
         dsp_line(2, 82, 20, "Floor sensors (mm)");
         dcol(0xFFFF);
-        sprintf(dl, "FL %d  FR %d", vl_dist[0], vl_dist[1]);
+        sprintf(dl, "FL %d  FR %d", vl_dist[3], vl_dist[2]);
         dsp_line(2, 100, 20, dl);
-        sprintf(dl, "RL %d  RR %d", vl_dist[2], vl_dist[3]);
+        sprintf(dl, "RL %d  RR %d", vl_dist[0], vl_dist[1]);
         dsp_line(2, 118, 20, dl);
         if (cl_on == 0) {
             dcol(0xFFE0);
@@ -586,6 +698,100 @@ void park_set(int on) {
     }
 }
 
+
+// ── RANDOM WANDER (RoverWander <seconds>) ───────────────────────────────────────────────────────────────────────────────────────
+// The rover drives straight at WAN_D, and when the lidar brake or the staircase guard stops it, it backs off a cliff or turns on the spot in a random direction
+// for a random time, until the way ahead is free again. It stops by itself after the given time, when a safety guard is off or faulted, when ANY echo is
+// closer than WAN_SIDE_MM (turning would hit it), when a turn finds no free way for 8 s, or when somebody sends a drive command (joystick). It only sees what the
+// lidar plane and the four floor sensors see: nothing low on the floor, nothing above the lidar, no glass. Stay close and keep RoverWander short.
+#define WAN_D        40          // drive share (with vmax 40 about 0.17 m/s)
+#define WAN_T        50          // turn share
+#define WAN_FREE_MM  400         // the way ahead counts as free from this distance
+#define WAN_SIDE_MM  110         // an echo this close anywhere stops the run
+int wan_end   = 0;
+int wan_st    = 0;               // 0 straight, 1 backing off a cliff, 2 turning
+int wan_t0    = 0;
+int wan_dir   = 1;
+int wan_min   = 800;             // ms the turn lasts at least
+int wan_turns = 0;
+int wan_flt   = 0;               // millis() since when a sensor fault has been seen (0 = none)
+
+void wander_stop(int code) {     // 0 command, 1 time over, 2 guard off or faulted, 3 echo too close, 4 turn without a free way, 5 drive command
+    if (wan_on == 0) { return; }
+    wan_on = 0;
+    drive = 0;
+    turn = 0;
+    rover_apply();
+    addLog("ROVER: wander off (reason %d, %d turns)", code, wan_turns);
+}
+
+void wander_turn() {
+    wan_st = 2;
+    wan_t0 = millis();
+    if (random(0, 100) < 50) { wan_dir = 1; } else { wan_dir = -1; }
+    wan_min = 500 + random(0, 1000);
+    wan_turns = wan_turns + 1;
+}
+
+int wander_start(int sec) {
+#if ROVER_LIDAR
+    if (lid_ok() == 0 || park == 1 || low == 1 || obs_on == 0 || cl_on == 0 || obs_fault == 1 || cl_fault == 1) { return 0; }
+    vmax = VMAX_START;
+    wan_st = 0;
+    wan_turns = 0;
+    wan_flt = 0;
+    wan_end = millis() + sec * 1000;
+    wan_on = 1;
+    addLog("ROVER: wander on for %d s", sec);
+    return 1;
+#else
+    return 0;
+#endif
+}
+
+void wander_step() {
+#if ROVER_LIDAR
+    int nf = 0;
+    if (wan_on == 0) { return; }
+    if (park == 1 || low == 1 || obs_on == 0 || cl_on == 0) { wander_stop(2); return; }
+    if (obs_fault == 1 || cl_fault == 1) {          // the guards hold the motors by themselves; only a fault that stays ends the run
+        if (wan_flt == 0) { wan_flt = millis(); }
+        if (millis() - wan_flt > 1500) { wander_stop(2); return; }
+    } else {
+        wan_flt = 0;
+    }
+    if (millis() > wan_end) { wander_stop(1); return; }
+    lastcmd = millis();                           // wandering renews the dead-man itself
+    nf = lid_min(0, 359);
+    if (nf > 0 && nf < WAN_SIDE_MM) { wander_stop(3); return; }
+    if (wan_st == 0) {
+        drive = WAN_D;
+        turn = 0;
+        if (cl_front == 1) { wan_st = 1; wan_t0 = millis(); }
+        else if (obs_front == 1) { wander_turn(); }
+    } else if (wan_st == 1) {
+        drive = 0 - WAN_D;
+        turn = 0;
+        if (millis() - wan_t0 > 900 || cl_rear == 1 || obs_rear == 1) { wander_turn(); }
+    } else {
+        drive = 0;
+        turn = wan_dir * WAN_T;
+        nf = lid_min(OBST_FRONT_A0, OBST_FRONT_A1);
+        if (cl_front == 1) {
+            wan_st = 1;
+            wan_t0 = millis();
+        } else if (millis() - wan_t0 > wan_min && (nf == 0 || nf > WAN_FREE_MM)) {
+            wan_st = 0;
+            turn = 0;
+        } else if (millis() - wan_t0 > 8000) {
+            wander_stop(4);
+            return;
+        }
+    }
+    rover_apply();
+#endif
+}
+
 #if ROVER_LINK
 // UDP LINK. Commands (text datagram to LINK_PORT, any subset of the fields):  "d=50 t=0 m=60 p=0"  (drive -100..100, turn -100..100,
 // max speed 10..100, park 0/1). Same rules as /rover_cmd: every command re-arms the 300 ms watchdog, the battery / cliff / stall guards
@@ -593,7 +799,7 @@ void park_set(int on) {
 //   {"v":12.49,"l":0,"r":0,"wd":0,"lo":0,"cl":15,"why":2,"yaw":-0.3,"el":0,"er":0,"st":0,"age":120}   (age = ms since the last command)
 // NO authentication, like /rover_cmd: anyone in the WLAN can drive the rover. Only for a trusted network.
 char lk_rx[64];
-char lk_tx[140];
+char lk_tx[200];
 char lk_ip[20];
 char lk_tmp[12];
 int  lk_open = 0;
@@ -609,13 +815,50 @@ int lk_int(char key[], int def) {
 }
 
 void lk_status() {
-    sprintf(lk_tx, "{\"v\":%d.%02d,\"l\":%d,\"r\":%d,\"wd\":%d,\"lo\":%d,\"cl\":%d,\"why\":%d,\"yaw\":%.1f,\"el\":%d,\"er\":%d,\"st\":%d,\"age\":%d}",
-            vbat_mv / 1000, (vbat_mv % 1000) / 10, motL, motR, stops, low, cliff_mask(), why, qmi_yaw, enc_ticks[0], enc_ticks[1], enc_stall, millis() - lastcmd);
+    sprintf(lk_tx, "{\"v\":%d.%02d,\"l\":%d,\"r\":%d,\"wd\":%d,\"lo\":%d,\"cl\":%d,\"ob\":%d,\"sp\":%d,\"why\":%d,\"yaw\":%.1f,\"el\":%d,\"er\":%d,\"st\":%d,\"ox\":%d,\"oy\":%d,\"age\":%d}",
+            vbat_mv / 1000, (vbat_mv % 1000) / 10, motL, motR, stops, low, cliff_mask(), obs_mask(), spd_full, why, qmi_yaw, enc_ticks[0], enc_ticks[1], enc_stall, (int)enc_x, (int)enc_y, millis() - lastcmd);
     udp(6, lk_ip, LINK_PORT, lk_tx);
+}
+
+// The lidar picture for the controlling program, 5 times a second, as 3 datagrams of 120 degrees each: "S<seq>,<first degree>," followed by 2 characters
+// per degree = the distance in 16 mm steps (12 bit: chars 48 + (v >> 6) and 48 + (v & 63)). Instead of /lidar_data: that handler keeps the VM for about
+// 300 ms per call and starved the floor sensors (the cliff guard saw them 'stale' and refused to drive, found 18.11.2026).
+char lk_sc[260];
+int  lk_sc_next = 0;
+int  lk_sc_seq = 0;
+
+void lk_scan() {
+    int i = 0;
+    int k = 0;
+    int p = 0;
+    int v = 0;
+    if (lk_open == 0 || strlen(lk_ip) == 0) { return; }
+    if (millis() - lastcmd > 2000) { return; }               // nobody is steering
+    if (millis() < lk_sc_next) { return; }
+    lk_sc_next = millis() + 250;
+    lk_sc_seq = lk_sc_seq + 1;
+    while (p < 3) {
+        sprintf(lk_sc, "S%d,%d,", lk_sc_seq, p * 120);
+        k = strlen(lk_sc);
+        i = 0;
+        while (i < 120) {
+            v = lid_dist[p * 120 + i] / 16;
+            if (v > 4095) { v = 4095; }
+            lk_sc[k] = 48 + (v >> 6);
+            lk_sc[k + 1] = 48 + (v & 63);
+            k = k + 2;
+            i = i + 1;
+        }
+        lk_sc[k] = 0;
+        udp(6, lk_ip, LINK_PORT, lk_sc);
+        p = p + 1;
+    }
 }
 
 void lk_poll() {
     int n = 0;
+    int got = 0;
+    int sp_new = 0;
     if (lk_open == 0) {
         lk_try = lk_try + 1;
         if (lk_try >= 20) {
@@ -627,10 +870,28 @@ void lk_poll() {
     n = udp(1, lk_rx);
     if (n > 0) {
         udp(4, lk_ip);
-        lk_cmds = lk_cmds + 1;
+        got = 1;
+        while (got < 8) {                             // drain the socket: only the newest command counts (one packet per pass made the answers lag behind)
+            n = udp(1, lk_rx);
+            if (n <= 0) { break; }
+            udp(4, lk_ip);
+            got = got + 1;
+        }
+        lk_cmds = lk_cmds + got;
+        if (wan_on == 1) {                            // a wander runs: a command of zero leaves it alone, a real drive command ends it
+            if (lk_int("d=", 0) != 0 || lk_int("t=", 0) != 0) { wander_stop(5); } else { lk_status(); return; }
+        }
         drive = rover_clamp(lk_int("d=", 0), -100, 100);
         turn = rover_clamp(lk_int("t=", 0), -100, 100);
         vmax = rover_clamp(lk_int("m=", vmax), 10, 100);
+        sp_new = lk_int("s=", -1);                    // s=<mm/s>: speed control like RoverSpeed, sent with EVERY command, so a rover that restarted is back in it at once
+        if (sp_new >= 0 && sp_new != spd_full) {
+            spd_full = rover_clamp(sp_new, 0, 600);
+            spd_out[0] = 0.0;
+            spd_out[1] = 0.0;
+            spd_mode[0] = 0;
+            spd_mode[1] = 0;
+        }
         if (lk_int("p=", -1) >= 0) { park_set(lk_int("p=", 0)); }
         if (park == 1 && (drive != 0 || turn != 0)) { park_set(0); }
         lastcmd = millis();
@@ -645,7 +906,73 @@ void lk_poll() {
 }
 #endif
 
-void Every50ms() {
+#if ROVER_ESPNOW
+// ESP-NOW LINK. Same commands as the UDP link, as text in ONE packet (up to 250 bytes, here at most 63): "d=40 t=0 m=40 p=0". The rover answers every packet to its
+// sender with "v=<mV> l=<motor> r=<motor> w=<why> c=<cliff mask> a=<ms since the last command>". The radio's own ACK tells the sender whether the rover got the packet.
+// Same safety as /rover_cmd: every command re-arms the 300 ms watchdog, the battery / cliff / obstacle / stall guards still win, a drive command ends a wander.
+// Without ESPNOW_ENC anyone in radio range can send a packet: use it only for tests; with ESPNOW_ENC 1 (CCMP) only the listed peer is accepted.
+char en_mac[20];
+char en_rx[64];
+char en_tx[80];
+char en_tmp[12];
+int  en_ok   = 0;
+int  en_cmds = 0;
+int  en_t0   = 0;
+int  en_rssi = 0;
+
+int en_int(char key[], int def) {
+    int pos = strFind(en_rx, key);
+    if (pos < 0) { return def; }
+    strSub(en_tmp, en_rx, pos + strlen(key), 8);
+    return strToInt(en_tmp);
+}
+
+void en_poll() {
+    int n = 0;
+    if (en_ok == 0) { return; }
+    while (espnowAvailable() > 0) {
+        n = espnowRecv(en_mac, en_rx, 63);
+        if (n <= 0) { break; }
+        en_rx[n] = 0;
+        en_cmds = en_cmds + 1;
+        en_t0 = millis();
+        en_rssi = espnowRssi();
+        if (wan_on == 1) {
+            if (en_int("d=", 0) != 0 || en_int("t=", 0) != 0) { wander_stop(5); } else { continue; }
+        }
+        drive = rover_clamp(en_int("d=", 0), -100, 100);
+        turn = rover_clamp(en_int("t=", 0), -100, 100);
+        vmax = rover_clamp(en_int("m=", vmax), 10, 100);
+        if (en_int("p=", -1) >= 0) { park_set(en_int("p=", 0)); }
+        if (park == 1 && (drive != 0 || turn != 0)) { park_set(0); }
+        lastcmd = millis();
+        if (drive == 0 && turn == 0) { enc_stall = 0; }
+        rover_apply();
+        sprintf(en_tx, "v=%d l=%d r=%d w=%d c=%d a=%d", vbat_mv, motL, motR, why, cliff_mask(), millis() - lastcmd);
+        espnowSend(en_mac, en_tx, strlen(en_tx));       // waits for the radio's ACK, at most 100 ms (the sender just spoke, so it is there)
+    }
+}
+#endif
+
+int e50_cnt = 0;
+int e50_rate = 0;
+int e50_t = 0;
+
+// Dead-man, wheel encoders / stall guard, speed control and the wander run here, NOT only in Every50ms(): a callback gets the VM only while TaskLoop sleeps in
+// delay(), and with the lidar streaming TaskLoop is busy 97 % of the time, so Every50ms ran 2..3 times per second instead of 20 (measured 18.11.2026: the dead-man
+// was checked every 300..500 ms, the speed controller's 200 ms windows were seconds long and the stall guard tripped on a wheel that had just started).
+// TaskLoop calls this between its steps (service_points); the throttle keeps it at about 20 Hz whoever gets there first.
+int ft_t = 0;
+int ft_cnt = 0;
+int ft_rate = 0;
+int ft_t1 = 0;
+
+void fast_tasks() {
+    if (millis() - ft_t < 40) { return; }
+    ft_t = millis();
+    ft_cnt = ft_cnt + 1;
+    if (millis() - ft_t1 >= 1000) { ft_rate = ft_cnt; ft_cnt = 0; ft_t1 = millis(); }
+    wander_step();
     if (millis() - lastcmd > WD_MS) {
         if (motL != 0 || motR != 0) {
             if (drive != 0 || turn != 0) { stops = stops + 1; }
@@ -657,6 +984,12 @@ void Every50ms() {
     enc_update(motL * DIR_L, motR * DIR_R);
     if (spd_ctl() == 1) { rover_apply(); }
     if (enc_on == 1 && enc_stall != 0 && why != 7) { rover_apply(); }
+}
+
+void Every50ms() {
+    e50_cnt = e50_cnt + 1;
+    if (millis() - e50_t >= 1000) { e50_rate = e50_cnt; e50_cnt = 0; e50_t = millis(); }
+    fast_tasks();
     if (PARK_AUTO_S > 0 && park == 0 && millis() - lastcmd > PARK_AUTO_S * 1000) { park_set(1); }
     dsp_n = dsp_n + 1;
     if (dsp_n >= 10) {
@@ -664,14 +997,17 @@ void Every50ms() {
         if (park == 0) { display_update(); }
     }
 #if ROVER_LINK
-    lk_poll();
+    if (park == 1) { lk_poll(); }
+#endif
+#if ROVER_ESPNOW
+    if (park == 1) { en_poll(); }        // parked: TaskLoop does nothing (delay 250), the callback has the VM; otherwise TaskLoop polls
 #endif
 }
 
 // ---- web ---------------------------------------------------------------------------------------------------------------
 
 int cliff_mask() {
-    return cl_flag[0] + cl_flag[1] * 2 + cl_flag[2] * 4 + cl_flag[3] * 8;
+    return cl_flag[3] + cl_flag[2] * 2 + cl_flag[0] * 4 + cl_flag[1] * 8;   // bits: FL FR RL RR
 }
 
 void WebCall() {
@@ -684,7 +1020,7 @@ void WebCall() {
     } else {
         webSend("{s}Battery (INA219){m}no data{e}");
     }
-    sprintf(ob, "{s}Floor sensors FL FR RL RR{m}%d  %d  %d  %d mm   window %d..%d{e}", vl_dist[0], vl_dist[1], vl_dist[2], vl_dist[3], cl_min, cl_max);
+    sprintf(ob, "{s}Floor sensors FL FR RL RR{m}%d  %d  %d  %d mm   window %d..%d{e}", vl_dist[3], vl_dist[2], vl_dist[0], vl_dist[1], cl_min, cl_max);
     webSend(ob);
     if (qmi_ok == 1) {
         sprintf(ob, "{s}IMU yaw / gyro z{m}%.1f deg  %.2f dps  %.1f C{e}", qmi_yaw, qmi_gz, qmi_temp);
@@ -704,14 +1040,21 @@ void WebCall() {
     }
 #if ROVER_LIDAR
     if (lid_ok() == 1) {
-        sprintf(ob, "{s}Lidar front / left{m}%d / %d mm   back / right %d / %d mm{e}", lid_min(330, 30), lid_min(60, 120), lid_min(150, 210), lid_min(240, 300));
+        sprintf(ob, "{s}Lidar front / back{m}%d / %d mm   brake %d (stop below %d mm)   left %d / right %d mm (direction assumed){e}", lid_min(OBST_FRONT_A0, OBST_FRONT_A1), lid_min(OBST_REAR_A0, OBST_REAR_A1), obs_on, obs_mm, lid_min(150, 210), lid_min(330, 30));
         webSend(ob);
+        webSend("{s}Lidar display{m}<a href='/lidar'>/lidar</a>{e}");
         sprintf(ob, "{s}Lidar scans / speed{m}%d  %d ms per turn  packets ok / crc %d / %d{e}", lid_scans, lid_scan_ms, lid_n_ok, lid_n_crc);
         webSend(ob);
     } else {
         webSend("{s}Lidar{m}no data (LIDAR_RX wired? 5 V on?){e}");
     }
 #endif
+#if ROVER_ESPNOW
+    sprintf(ob, "{s}ESP-NOW commands / last RSSI / age{m}%d / %d dBm / %d ms{e}", en_cmds, en_rssi, millis() - en_t0);
+    webSend(ob);
+#endif
+    sprintf(ob, "{s}Loop rates (per second){m}TaskLoop %d, Every50ms %d, fast tasks (dead-man, encoders, speed control) %d; a floor sensor is stale after %d ms{e}", tl_rate, e50_rate, ft_rate, CLIFF_STALE_MS);
+    webSend(ob);
     webSend("{s}Rover page{m}<a href='/rover'>/rover</a>{e}");
 }
 
@@ -732,21 +1075,54 @@ void rover_page() {
     webSendFile("/rover.html");
 }
 
+#if ROVER_LIDAR
+// /lidar_data: the raw scan in lidar degrees (0 = lidar's own forward, "ahead" of the rover is 270): the page /lidar (file /lidar.html) turns it
+void lidar_data() {
+    int i = 0;
+    sprintf(ob, "{\"ok\":%d,\"sc\":%d,\"ms\":%d,\"f0\":%d,\"f1\":%d,\"b0\":%d,\"b1\":%d,\"on\":%d,\"mm\":%d,\"nf\":%d,\"nb\":%d,\"d\":[", lid_ok(), lid_scans, lid_scan_ms, OBST_FRONT_A0, OBST_FRONT_A1, OBST_REAR_A0, OBST_REAR_A1, obs_on, obs_mm, lid_min(OBST_FRONT_A0, OBST_FRONT_A1), lid_min(OBST_REAR_A0, OBST_REAR_A1));
+    webSend(ob);
+    while (i < 360) {
+        sprintf(ob, "%d,%d,%d,%d,%d%s", lid_dist[i], lid_dist[i + 1], lid_dist[i + 2], lid_dist[i + 3], lid_dist[i + 4], i < 355 ? "," : "]}");
+        webSend(ob);
+        i = i + 5;
+    }
+}
+#endif
+
 void WebOn() {
     int h = webHandler();
+    int wd_a = 0;
+    int wd_b = 0;
     if (h == 1) {
         rover_page();
     }
+#if ROVER_LIDAR
+    if (h == 3) {
+        webSendFile("/lidar.html");
+    }
+    if (h == 4) {
+        lidar_data();
+    }
+#endif
     if (h == 2) {
-        if (webArg("d", cb) > 0) { drive = rover_clamp(strToInt(cb), -100, 100); }
-        if (webArg("t", cb) > 0) { turn = rover_clamp(strToInt(cb), -100, 100); }
-        if (webArg("m", cb) > 0) { vmax = rover_clamp(strToInt(cb), 10, 100); }
-        if (webArg("p", cb) > 0) { park_set(strToInt(cb)); }
-        if (park == 1 && (drive != 0 || turn != 0)) { park_set(0); }
-        lastcmd = millis();
-        if (drive == 0 && turn == 0) { enc_stall = 0; }   // the stick is released: a stall is cleared
-        rover_apply();
-        sprintf(ob, "{\"v\":%d.%02d,\"l\":%d,\"r\":%d,\"wd\":%d,\"lo\":%d,\"cl\":%d,\"el\":%d,\"er\":%d,\"st\":%d,\"sl\":%d,\"sr\":%d}", vbat_mv / 1000, (vbat_mv % 1000) / 10, motL, motR, stops, low, cliff_mask(), enc_ticks[0], enc_ticks[1], enc_stall, (int)spd_v[0], (int)spd_v[1]);
+        if (wan_on == 1) {                            // a status poll (d=0, t=0) leaves the wander alone, a real drive command ends it
+            wd_a = 0;
+            wd_b = 0;
+            if (webArg("d", cb) > 0) { wd_a = strToInt(cb); }
+            if (webArg("t", cb) > 0) { wd_b = strToInt(cb); }
+            if (wd_a != 0 || wd_b != 0) { wander_stop(5); }
+        }
+        if (wan_on == 0) {
+            if (webArg("d", cb) > 0) { drive = rover_clamp(strToInt(cb), -100, 100); }
+            if (webArg("t", cb) > 0) { turn = rover_clamp(strToInt(cb), -100, 100); }
+            if (webArg("m", cb) > 0) { vmax = rover_clamp(strToInt(cb), 10, 100); }
+            if (webArg("p", cb) > 0) { park_set(strToInt(cb)); }
+            if (park == 1 && (drive != 0 || turn != 0)) { park_set(0); }
+            lastcmd = millis();
+            if (drive == 0 && turn == 0) { enc_stall = 0; }   // the stick is released: a stall is cleared
+            rover_apply();
+        }
+        sprintf(ob, "{\"v\":%d.%02d,\"l\":%d,\"r\":%d,\"wd\":%d,\"lo\":%d,\"cl\":%d,\"el\":%d,\"er\":%d,\"st\":%d,\"sl\":%d,\"sr\":%d,\"ob\":%d}", vbat_mv / 1000, (vbat_mv % 1000) / 10, motL, motR, stops, low, cliff_mask(), enc_ticks[0], enc_ticks[1], enc_stall, (int)spd_v[0], (int)spd_v[1], obs_mask());
         webSend(ob);
     }
 }
@@ -814,7 +1190,7 @@ void Command(char cmd[]) {
         strToken(a, cmd, ' ', 2);
         strToken(b, cmd, ' ', 3);
         if (strlen(a) == 0) {
-            sprintf(ob, "guard %d, window %d..%d mm, F%d%d R%d%d fault %d", cl_on, cl_min, cl_max, cl_flag[0], cl_flag[1], cl_flag[2], cl_flag[3], cl_fault);
+            sprintf(ob, "guard %d, window %d..%d mm, F%d%d R%d%d fault %d", cl_on, cl_min, cl_max, cl_flag[3], cl_flag[2], cl_flag[0], cl_flag[1], cl_fault);
             responseCmnd(ob);
         } else if (strlen(b) == 0) {
             cl_on = strToInt(a);
@@ -826,6 +1202,36 @@ void Command(char cmd[]) {
             cl_max = strToInt(b);
             responseCmnd("window set");
         }
+    } else if (strStartsWith(cmd, "OBST")) {
+        strToken(a, cmd, ' ', 2);
+        if (strlen(a) > 0) {
+            ch = strToInt(a);
+            if (ch == 0) {
+                obs_on = 0;
+                addLog("ROVER: OBSTACLE BRAKE OFF - the rover can drive into things");
+            } else if (ch == 1) {
+                obs_on = 1;
+            } else if (ch >= 50) {
+                obs_on = 1;
+                obs_mm = ch;
+            }
+            rover_apply();
+        }
+        sprintf(ob, "brake %d, stop below %d mm, ahead %d mm, behind %d mm, F%d R%d lidar fault %d", obs_on, obs_mm, obs_df, obs_dr, obs_front, obs_rear, obs_fault);
+        responseCmnd(ob);
+    } else if (strStartsWith(cmd, "WANDER")) {
+        strToken(a, cmd, ' ', 2);
+        if (strlen(a) > 0) {
+            ch = strToInt(a);
+            if (ch <= 0) {
+                wander_stop(0);
+            } else if (wander_start(rover_clamp(ch, 1, 600)) == 0) {
+                responseCmnd("not started: needs the lidar, no fault, no park, the obstacle brake and the staircase guard on");
+                return;
+            }
+        }
+        sprintf(ob, "wander %d, %d s left, state %d, turns %d", wan_on, wan_on * ((wan_end - millis()) / 1000), wan_st, wan_turns);
+        responseCmnd(ob);
     } else if (strStartsWith(cmd, "PARK")) {
         strToken(a, cmd, ' ', 2);
         if (strlen(a) > 0) { park_set(strToInt(a)); }
@@ -882,7 +1288,7 @@ int main() {
     ina_addr = INA_ADDR;  ina_bus = I2C_BUS;  ina_release();
     qmi_addr = 0x6B;      qmi_bus = I2C_BUS;  qmi_release();
     ak_addr = AK_ADDR;    ak_bus = I2C_BUS;   ak_release();
-    vl_bus = I2C_BUS;  vl_claimed = 1;  vl_mux_ok = 1;  vl_release();
+    vl_bus = TOF_BUS;  vl_claimed = 1;  vl_mux_ok = 1;  vl_release();
     ina_init(INA_ADDR, I2C_BUS);
 #if ROVER_LIDAR
     lid_init(LIDAR_RX);
@@ -892,7 +1298,7 @@ int main() {
     if (qmi_ok == 1) { qmi_cal_gyro(200); }
 #if ROVER_REAL
     {
-        if (vl_mux_init(I2C_BUS) == 1) {
+        if (vl_mux_init(TOF_BUS) == 1) {
             vl_timeout = 60;
             i = 0;
             while (i < 4) {
@@ -907,6 +1313,20 @@ int main() {
     tasmInfo(2, ip);
     webOn(1, "/rover");
     webOn(2, "/rover_cmd");
+#if ROVER_LIDAR
+    webOn(3, "/lidar");
+    webOn(4, "/lidar_data");
+#endif
+#if ROVER_ESPNOW
+#if ESPNOW_ENC
+    espnowKey(ESPNOW_KEY);                           // the key counts for the peers added AFTER this call, on both sides
+    espnowPeer(ESPNOW_PEER);
+#else
+    addLog("ROVER: ESP-NOW link is OPEN (no key): anyone in radio range can drive the rover");
+#endif
+    en_ok = espnowBegin(0);                          // 0 = keep the channel of the WiFi link
+    addLog("ROVER: ESP-NOW begin %d, encrypted %d", en_ok, ESPNOW_ENC);
+#endif
     display_first();
     addLog("ROVER: ready (sim %d), page /rover, watchdog %d ms, cliff window %d..%d mm", ROVER_SIM, WD_MS, cl_min, cl_max);
     return 0;

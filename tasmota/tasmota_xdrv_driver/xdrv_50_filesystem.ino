@@ -89,6 +89,16 @@ ftp       start stop ftp server: 0 = OFF, 1 = SDC, 2 = FlashFile
 
 const int UFS_FILENAME_SIZE = 50;
 
+// Open files on SD / SD_MMC: arduino-esp32 gives ONE pool of 5 to the whole firmware (web server, downloads, logs, TinyC). A TinyC build that raises
+// TC_MAX_FILE_HANDLES (user_config_override.h) has to raise this pool too, or the sixth open() fails: the pool follows, with 2 files of reserve.
+#ifndef UFS_SD_MAX_OPEN_FILES
+#define UFS_SD_MAX_OPEN_FILES 5
+#endif
+#if defined(USE_TINYC) && defined(TC_MAX_FILE_HANDLES) && ((TC_MAX_FILE_HANDLES + 2) > UFS_SD_MAX_OPEN_FILES)
+#undef UFS_SD_MAX_OPEN_FILES
+#define UFS_SD_MAX_OPEN_FILES (TC_MAX_FILE_HANDLES + 2)
+#endif
+
 // Global file system pointer
 FS *ufsp;
 // Flash file system pointer
@@ -202,7 +212,80 @@ char *fileOnly(char *fname){
 
 
 #ifdef USE_SDCARD
+#ifdef ESP32
+// Start state of an I/O expander (Waveshare ESP32-S3-CAM). NO SPECIAL FIRMWARE: a file on the FLASH file system (mounted before the card)
+// describes the pins - /expander.cfg with "<i2c address>,<output levels>[,<direction>]", e.g. "0x24,0x67,0x7F". Without the file nothing
+// happens. It runs BEFORE the SD card is initialised, because on that board the card's DAT3/CS is pin EXIO2 of the expander (a CH32V003,
+// I2C 0x24), not an ESP pin, and it must be HIGH for the card to answer in SD mode. After power-up all expander outputs are LOW, so without
+// the file the card never answers (measured 17.11.2026: cold start gave "UfsType 3", no SD). The same file sets every other pin at the same
+// time (Waveshare: 0x67 = EXIO0, 1, 2, 5, 6 high = touch/LCD reset released, SD select high, battery switch on, LED; EXIO3 = camera PWDN low
+// = camera ON, EXIO4 = loudspeaker amplifier off), so a TinyC program or the audio plugin finds the board in a defined state.
+// Expander registers (CH32V003 firmware of the Waveshare boards): 0x02 direction (1 = output), 0x03 output levels, 0x04 pin levels (the only
+// one that reads back reliably). Writing the direction resets the outputs to high, so the direction goes first and the levels after it.
+// Needs the Tasmota I2C bus on the board pins (Gpio8 = I2C SDA, Gpio7 = I2C SCL).
+// The expander may sit on either Tasmota I2C bus (bus 1 = Wire, bus 2 = Wire1): UfsExpanderInit picks the one that answers.
+static TwoWire *ufs_ex_wire = &Wire;
+static void UfsExpanderWrite(uint8_t addr, uint8_t reg, uint8_t val) {
+  ufs_ex_wire->beginTransmission(addr); ufs_ex_wire->write(reg); ufs_ex_wire->write(val); ufs_ex_wire->endTransmission(true);
+}
+static uint8_t UfsExpanderRead(uint8_t addr, uint8_t reg) {
+  ufs_ex_wire->beginTransmission(addr); ufs_ex_wire->write(reg); ufs_ex_wire->endTransmission(false);
+  ufs_ex_wire->requestFrom(addr, (uint8_t)1);
+  return ufs_ex_wire->available() ? ufs_ex_wire->read() : 0;
+}
+static void UfsExpanderInit(void) {
+  if (!ffsp || !(TasmotaGlobal.i2c_enabled[0] || TasmotaGlobal.i2c_enabled[1])) { return; }
+  File f = ffsp->open("/expander.cfg", "r");
+  if (!f) { return; }
+  char buf[40]; size_t n = f.readBytes(buf, sizeof(buf) - 1); buf[n] = 0; f.close();
+  char *cp = buf;
+  uint32_t addr = strtoul(cp, &cp, 0);                 // base 0: "0x24" = hex
+  while (*cp == ',' || *cp == ' ') { cp++; }
+  char *ep = cp;
+  uint32_t levels = strtoul(cp, &ep, 0);
+  bool has_levels = (ep != cp);
+  cp = ep; while (*cp == ',' || *cp == ' ') { cp++; }
+  uint32_t dir = strtoul(cp, &ep, 0);
+  bool has_dir = (ep != cp);
+  if (addr < 0x08 || addr > 0x77 || !has_levels || levels > 0xFF || dir > 0xFF) {
+    AddLog(LOG_LEVEL_INFO, PSTR(D_LOG_UFS "/expander.cfg ignored (need \"0x24,0x67[,0x7F]\")")); return;
+  }
+  if (!has_dir) { dir = 0x7F; }                        // Waveshare: pins 0..6 outputs, pin 7 = charger detect INPUT
+  bool found = false;
+  if (TasmotaGlobal.i2c_enabled[0]) {                  // bus 1 first, then bus 2
+    Wire.beginTransmission(addr);
+    if (0 == Wire.endTransmission(true)) { ufs_ex_wire = &Wire; found = true; }
+  }
+  if (!found && TasmotaGlobal.i2c_enabled[1]) {
+    Wire1.beginTransmission(addr);
+    if (0 == Wire1.endTransmission(true)) { ufs_ex_wire = &Wire1; found = true; }
+  }
+  if (!found) { return; }                              // no expander at that address
+  AddLog(LOG_LEVEL_DEBUG, PSTR(D_LOG_UFS "Expander 0x%02X found on I2C bus %d"), addr, (ufs_ex_wire == &Wire) ? 1 : 2);
+  uint8_t mask = dir & 0x7F;                           // compare only the output pins (bit 7 is an input here)
+  // Measured 17.11.2026: right after power-up (this runs ~90 ms after boot) the expander's own start-up is not finished and resets its pins
+  // AFTERWARDS (cold start read "in=0x80, direction 0x67" although the levels had been written). So: write, wait, read back, and write
+  // again until the state is still there after a pause (at most 10 rounds ~ 1 s; a warm restart needs one).
+  uint32_t rounds = 0;
+  bool ok = false;
+  while (!ok && rounds < 10) {
+    rounds++;
+    UfsExpanderWrite(addr, 0x02, dir);                 // direction first: it resets the outputs to high ...
+    UfsExpanderWrite(addr, 0x03, levels);              // ... then the wanted levels
+    delay(40);
+    ok = ((UfsExpanderRead(addr, 0x04) & mask) == (levels & mask));
+    if (ok) { delay(60); ok = ((UfsExpanderRead(addr, 0x04) & mask) == (levels & mask)); }   // still there after the expander's own start-up?
+  }
+  AddLog(LOG_LEVEL_INFO, PSTR(D_LOG_UFS "Expander 0x%02X set: levels 0x%02X, direction 0x%02X, pins now 0x%02X, %i round(s)%s"),
+         addr, levels, dir, UfsExpanderRead(addr, 0x04), rounds, ok ? "" : " - NOT STABLE");
+  delay(10);
+}
+#endif  // ESP32
+
 void UfsCheckSDCardInit(void) {
+#ifdef ESP32
+  UfsExpanderInit();         // start state of an I/O expander (file /expander.cfg) FIRST: the card select can be a pin on it and must be high
+#endif
   // Try SPI mode first
   // SPI mode requires SDCARD_CS to be configured
 /*
@@ -230,7 +313,7 @@ void UfsCheckSDCardInit(void) {
     } else {
       SPI.begin(Pin(GPIO_SPI_CLK), Pin(GPIO_SPI_MISO), Pin(GPIO_SPI_MOSI), -1);
     }
-    if (SD.begin(cs, (1 == spi_bus) ? SPI_HSPI : SPI)) {
+    if (SD.begin(cs, (1 == spi_bus) ? SPI_HSPI : SPI, 4000000, "/sd", UFS_SD_MAX_OPEN_FILES)) {
 #endif // ESP32
 #ifdef ESP8266
       ufsp = &SDFS;
@@ -284,7 +367,7 @@ void UfsCheckSDCardInit(void) {
       SD_MMC.setPowerChannel(4);  // SD card IO power if not set by command Ldo4 (deprecated)
     }
 #endif
-    if (SD_MMC.begin("/sd", !bit_4_mode /*mode 1 bit*/, false /*format_if_failed*/)) {    // mount under "/sd" to be consistent with SD SPI
+    if (SD_MMC.begin("/sd", !bit_4_mode /*mode 1 bit*/, false /*format_if_failed*/, BOARD_MAX_SDMMC_FREQ, UFS_SD_MAX_OPEN_FILES)) {    // mount under "/sd" to be consistent with SD SPI
       ufsp = &SD_MMC;
 
       ufs_type = UFS_TSDC;
@@ -1414,7 +1497,9 @@ const char UFS_FORM_FILE_UPG[] PROGMEM =
   "if(f.size>%d){var d=(location.search.match(/dir=(\\d+)/)||[])[1]||'1';"
   "var p=(d=='2'?'/ffs/':'/')+f.name;"
   "eb('f2').innerHTML='uploading '+(f.size>>10)+' kB via :83 ...';"
-  "fetch(location.protocol+'//'+location.hostname+':83/ufs'+p,{method:'POST',body:new Blob([f],{type:'text/plain'})})"
+  // 16.11.2026 (Andreas): with a web password set, port 83 wants the upload token (TinyC /tc_api?cmd=ultok, needs the login)
+  "fetch('/tc_api?cmd=ultok').then(r=>r.json()).catch(()=>({})).then(j=>"
+  "fetch(location.protocol+'//'+location.hostname+':83/ufs'+p+(j&&j.tok?'?tok='+j.tok:''),{method:'POST',body:new Blob([f],{type:'text/plain'})}))"
   ".then(r=>r.text()).then(t=>{eb('f2').innerHTML=t;setTimeout(function(){location.href='/ufsd?dir='+d;},1500);})"
   ".catch(e=>{eb('f2').innerHTML='upload failed: '+e;});return false;}"
   "fo.action+=f.size;fo.submit();return false;}</script>"
@@ -1672,6 +1757,28 @@ void UfsDirectory(void) {
   Web.upload_file_type = UPL_UFSFILE;
 }
 
+// File manager: folders first, then files, both alphabetical (case-insensitive). A folder's entries are read into a list first, which costs
+// UFS_SORT_MAX * sizeof(UfsSortEntry) bytes (about 10 kB, PSRAM when there is some) while the page is built and is freed again right after. Without
+// memory, or beyond UFS_SORT_MAX entries, the rest follows in the order the file system returns it. -DUFS_NO_SORT leaves the sorting out (ESP8266 has none).
+#if defined(ESP32) && !defined(UFS_NO_SORT)
+#define UFS_SORT_LIST
+#ifndef UFS_SORT_MAX
+#define UFS_SORT_MAX 128
+#endif
+struct UfsSortEntry {
+  char name[64];
+  uint32_t tm;
+  uint32_t size;
+  bool dir;
+};
+static int UfsSortCmp(const void *pa, const void *pb) {
+  const UfsSortEntry *a = (const UfsSortEntry*)pa;
+  const UfsSortEntry *b = (const UfsSortEntry*)pb;
+  if (a->dir != b->dir) { return a->dir ? -1 : 1; }
+  return strcasecmp(a->name, b->name);
+}
+#endif  // ESP32 && !UFS_NO_SORT
+
 void UfsListDir(char *path, uint8_t depth) {
   char name[UFS_FILENAME_SIZE];
   char npath[128];
@@ -1695,30 +1802,9 @@ void UfsListDir(char *path, uint8_t depth) {
       }
       WSContentSend_P(UFS_FORM_SDC_DIRd, npath, path, PSTR(".."));
     }
-    char *ep;
-    while (true) {
-      WiFiClient client = Webserver->client();
-      // abort if the client disconnected
-      // if there is a huge folder, then this gives a way out by refresh of browser
-      if (!client.connected()){
-        break;
-      }
-
-      File entry = dir.openNextFile();
-      if (!entry) {
-        break;
-      }
-      // esp32 returns path here, shorten to filename
-      ep = (char*)entry.name();
-      if (*ep == '/') { ep++; }
-      char *lcp = strrchr(ep,'/');
-      if (lcp) {
-        ep = lcp + 1;
-      }
-
-      uint32_t tm = entry.getLastWrite();
+    // one directory entry on the page (ep = file name, no path)
+    auto show = [&](const char *ep, bool isdir, uint32_t tm, uint32_t fsize) {
       String tstr = GetDT(tm);
-
       char *pp = path;
       if (!*(pp + 1)) { pp++; }
       char *cp = name;
@@ -1742,7 +1828,7 @@ void UfsListDir(char *path, uint8_t depth) {
 #else
         char delpath[2] = " ";
 #endif // GUI_TRASH_FILE
-        if (entry.isDirectory()) {
+        if (isdir) {
           ext_snprintf_P(npath, sizeof(npath), UFS_FORM_SDC_HREF, ppe, epe);
 
           WSContentSend_P(UFS_FORM_SDC_DIRb, hiddable ? UFS_FORM_SDC_DIR_HIDDABLE : UFS_FORM_SDC_DIR_NORMAL, npath, epe,
@@ -1767,12 +1853,65 @@ void UfsListDir(char *path, uint8_t depth) {
   #endif // GUI_TRASH_FILE
           ext_snprintf_P(npath, sizeof(npath), UFS_FORM_SDC_HREF, ppe, epe);
           WSContentSend_P(UFS_FORM_SDC_DIRb, hiddable ? UFS_FORM_SDC_DIR_HIDDABLE : UFS_FORM_SDC_DIR_NORMAL, npath, epe,
-                          HtmlEscape(name).c_str(), tstr.c_str(), entry.size(), delpath, editpath);
+                          HtmlEscape(name).c_str(), tstr.c_str(), fsize, delpath, editpath);
         }
-        entry.close();
-
         yield(); // trigger watchdog reset
       }
+    };
+
+    char *ep;
+#ifdef UFS_SORT_LIST
+    UfsSortEntry *list = (UfsSortEntry*)special_malloc(UFS_SORT_MAX * sizeof(UfsSortEntry));
+    uint32_t n = 0;
+    if (list) {
+      while (n < UFS_SORT_MAX) {
+        File entry = dir.openNextFile();
+        if (!entry) { break; }
+        ep = (char*)entry.name();
+        if (*ep == '/') { ep++; }
+        char *lcp = strrchr(ep, '/');
+        if (lcp) { ep = lcp + 1; }
+        if (strlen(ep) >= sizeof(list[0].name)) {          // too long for the list: show it at once, unsorted
+          show(ep, entry.isDirectory(), entry.getLastWrite(), entry.size());
+        } else {
+          strlcpy(list[n].name, ep, sizeof(list[n].name));
+          list[n].tm = entry.getLastWrite();
+          list[n].size = entry.size();
+          list[n].dir = entry.isDirectory();
+          n++;
+        }
+        entry.close();
+      }
+      qsort(list, n, sizeof(UfsSortEntry), UfsSortCmp);
+      for (uint32_t i = 0; i < n; i++) {
+        if (!Webserver->client().connected()) { break; }   // client gone (huge folder: a refresh of the browser is the way out)
+        show(list[i].name, list[i].dir, list[i].tm, list[i].size);
+      }
+      free(list);
+    }
+#endif  // UFS_SORT_LIST
+    // no list (memory, ESP8266, UFS_NO_SORT) or more entries than the list holds: the rest in the order the file system gives it
+    while (true) {
+      WiFiClient client = Webserver->client();
+      // abort if the client disconnected
+      // if there is a huge folder, then this gives a way out by refresh of browser
+      if (!client.connected()){
+        break;
+      }
+
+      File entry = dir.openNextFile();
+      if (!entry) {
+        break;
+      }
+      // esp32 returns path here, shorten to filename
+      ep = (char*)entry.name();
+      if (*ep == '/') { ep++; }
+      char *lcp = strrchr(ep,'/');
+      if (lcp) {
+        ep = lcp + 1;
+      }
+      show(ep, entry.isDirectory(), entry.getLastWrite(), entry.size());
+      entry.close();
     }
     dir.close();
   }

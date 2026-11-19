@@ -18,14 +18,29 @@
 //                     without either, camControl(21,…) just returns -1.
 //
 // Compile: node compile_cli.js webcam_tinyc.tc webcam_tinyc.tcb -DBOARD_DFROBOT
-//      or: node compile_cli.js webcam_tinyc.tc webcam_tinyc.tcb -DBOARD_WAVESHARE   (the `// @defines:` line below says DFROBOT: pass -DBOARD_WAVESHARE and take that line out)
+//      or: node compile_cli.js webcam_tinyc.tc webcam_tinyc.tcb -DBOARD_WAVESHARE
 //      or: node compile_cli.js webcam_tinyc.tc webcam_tinyc.tcb -DBOARD_GOOUUU
 //      or: node compile_cli.js webcam_tinyc.tc webcam_tinyc.tcb -DBOARD_AITHINKER
 //
 // Camera capture runs in TaskLoop (VM task thread) — required for
 // esp_camera_fb_get() which crashes if called from main thread.
 // ═══════════════════════════════════════════════════════════════════
-// @defines: -DBOARD_DFROBOT
+
+// ⚠️ BOARD CHOICE — THERE IS NO DEFAULT (18.11.2026). Name your board, either with `-DBOARD_X` on the compiler command line (tc_deploy.mjs, push_tcb.sh,
+// compile_cli.js) or, in the browser IDE, by writing `#define BOARD_X` (BOARD_DFROBOT, BOARD_WAVESHARE, BOARD_GOOUUU or BOARD_AITHINKER) as the FIRST line of this file.
+// Without one the build stops at the `#error` line below. It used to carry a hidden `// @defines: -DBOARD_DFROBOT` comment that the compiler read as a default:
+// a push without -D got the DFRobot pins and night vision on a Goouuu board (camera init failed with 0x106), and in the IDE `#define BOARD_GOOUUU` plus that comment
+// meant TWO boards were defined at once (gemu, 18.11.2026). The blocks below switch the DFRobot defaults off again where another board is named
+// (HAS_NIGHT / the LTR-308 code, the second `campins`).
+#ifdef BOARD_WAVESHARE
+#undef BOARD_DFROBOT
+#endif
+#ifdef BOARD_GOOUUU
+#undef BOARD_DFROBOT
+#endif
+#ifdef BOARD_AITHINKER
+#undef BOARD_DFROBOT
+#endif
 
 // ─── Board-specific camera pins ───
 // Order: pwdn, reset, xclk, sda, scl, d7, d6, d5, d4, d3, d2, d1, d0, vsync, href, pclk
@@ -45,13 +60,13 @@ int campins[] = {-1, -1, 5, 8, 9, 4, 6, 7, 14, 17, 21, 18, 16, 1, 2, 15};
 
 #ifdef BOARD_WAVESHARE
 // Waveshare ESP32-S3-CAM-OV5640 / -GC0308 (Rev 1.1; ESP32-S3R8, 16 MB flash, 8 MB octal PSRAM).
-// ⚠️ PREPARED FROM THE SCHEMATIC AND DEMO CODE (14.11.2026), NOT YET TRIED ON A BOARD. Pins from the Waveshare demo, see
-// entwuerfe/waveshare_cam_daten_2026-11-14.md. PWDN is NOT a GPIO here: it hangs on the I/O expander (EXIO3, active high, low after reset =
-// camera on), RESET is tied high. SCCB SDA 8 / SCL 7 is the I2C bus of the whole board (codecs, expander, touch, connector J6).
+// Pins from the Waveshare demo (schematic Rev 1.1), tried on the board 16.11.2026 with an OV2640 module (the OV5640 module that came with the board was defective); see
+// entwuerfe/waveshare_cam_daten_2026-11-14.md. PWDN is NOT a GPIO here: it hangs on the I/O expander (EXIO3, active high; the expander's outputs are ALL HIGH after every reset = camera
+// POWERED DOWN, so exio_init() must run first), RESET is tied high. SCCB SDA 8 / SCL 7 is the I2C bus of the whole board (codecs, expander, touch, connector J6).
 int campins[] = {-1, -1, 38, 8, 7, 21, 39, 40, 42, 46, 48, 47, 45, 17, 18, 41};
 // Person detection: the board has the PSRAM for it. No night vision: no IR LEDs and no light sensor on this board.
 #define HAS_PERSON
-// The expander (loudspeaker amplifier, battery switch, LEDs) is started AFTER the camera, see main().
+// The expander (camera PWDN, SD card select, loudspeaker amplifier, battery switch, LEDs) is started BEFORE the camera, see main().
 #include "ws_exio.tc"
 #endif
 
@@ -63,6 +78,17 @@ int campins[] = {-1, -1, 15, 4, 5, 16, 17, 18, 12, 10, 8, 9, 11, 6, 7, 13};
 #ifdef BOARD_AITHINKER
 // AI-Thinker ESP32-CAM (OV2640), flash LED on GPIO4
 int campins[] = {32, -1, 0, 26, 27, 35, 34, 39, 36, 21, 19, 18, 5, 25, 23, 22};
+#endif
+
+// A board must have been named (see BOARD CHOICE above). Stops here, with this line number, instead of with a cryptic "campins" error further down.
+#ifndef BOARD_DFROBOT
+#ifndef BOARD_WAVESHARE
+#ifndef BOARD_GOOUUU
+#ifndef BOARD_AITHINKER
+#error NO BOARD NAMED - write  #define BOARD_DFROBOT  (or BOARD_WAVESHARE / BOARD_GOOUUU / BOARD_AITHINKER)  as the first line of this file, or compile with -DBOARD_xxx
+#endif
+#endif
+#endif
 #endif
 
 // ─── Camera constants ───
@@ -89,6 +115,12 @@ int campins[] = {32, -1, 0, 26, 27, 35, 34, 39, 36, 21, 19, 18, 5, 25, 23, 22};
 #define RES_COUNT           10
 #define RES_FIRST           6       // index 0 = FRAMESIZE_QVGA 320x240
 #define RES_DEFAULT         4       // index 4 = FRAMESIZE_VGA 640x480
+
+// 1 = the camera hangs upside down (USB connectors up, e.g. on the rover): the picture is turned by 180 degrees (vflip + hmirror flipped against the
+// standard mounting, 18.11.2026). Set it in a LOCAL copy for such a device; the repository default stays 0.
+#ifndef CAM_ROTATE180
+#define CAM_ROTATE180       0
+#endif
 
 // Sensor parameter IDs for camControl(9, param, value)
 #define CAM_VFLIP           0
@@ -216,10 +248,14 @@ int initCamera() {
     addLog("TCC: sensor PID = 0x%x", pid);
 
     if (pid == OV3660_PID) {
-        camControl(9, CAM_VFLIP, 1);
+        camControl(9, CAM_VFLIP, CAM_ROTATE180 == 1 ? 0 : 1);     // the stand mounting needs vflip 1; upside down: vflip 0 and hmirror 1
+        camControl(9, CAM_HMIRROR, CAM_ROTATE180);
         camControl(9, CAM_BRIGHTNESS, 1);
         camControl(9, CAM_SATURATION, -2);
         addLog("TCC: OV3660 settings applied");
+    } else if (CAM_ROTATE180 == 1) {
+        camControl(9, CAM_VFLIP, 1);
+        camControl(9, CAM_HMIRROR, 1);
     }
 
     return 0;
@@ -1180,6 +1216,13 @@ int main() {
         fileMkdir("/PICS");
     }
 
+#ifdef BOARD_WAVESHARE
+    // The expander BEFORE the camera: its outputs are all high after every reset, and EXIO3 = camera PWDN (active high) keeps the sensor powered
+    // down, so cameraInit() fails with 0x106 (measured 16.11.2026, first on a good OV2640 module). exio_init() writes 0x67 (PWDN low).
+    if (exio_init(0) == 0) { addLog("TCC: Waveshare expander 0x24 not found"); }
+    delay(20);
+#endif
+
     // Initialize camera
     int ok = initCamera();
     if (ok != 0) {
@@ -1187,11 +1230,6 @@ int main() {
     }
     cam_ok = 1;
     res_masse();
-#ifdef BOARD_WAVESHARE
-    // The expander after the camera: its I2C traffic on the camera's own SCCB pins must not come first. Camera PWDN stays low (camera on).
-    if (exio_init(0) == 0) { addLog("TCC: Waveshare expander 0x24 not found"); }
-#endif
-
     // ⚠️ `Sleep 0` FOR A STREAMING CAMERA (gemu 03.10.2026). Tasmota's default `Sleep 50` also
     // switches the WiFi radio to modem sleep: a request to the web server then takes ~140 ms
     // instead of ~45 ms (measured on an AI-Thinker ESP32-CAM and on the DFR1154), and the
