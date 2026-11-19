@@ -23,14 +23,14 @@ jobs:
           echo "--- Inhalt von Ottelos Repo ---"
           ls -la overlay
           cp -f overlay/tasmota/user_config_override.h tasmota/user_config_override.h
-          for f in platformio_tasmota_cenv.ini platformio_tasmota32.ini ccache_wrapper.py; do
-            if [ -f "overlay/$f" ]; then
-              cp -f "overlay/$f" .
-            else
-              echo "Hinweis: $f gibt es bei Ottelo nicht, wird uebersprungen"
-            fi
+          shopt -s nullglob
+          for f in overlay/*.ini overlay/*.py; do
+            echo "Kopiere $(basename "$f")"
+            cp -f "$f" .
           done
           if [ -d overlay/boards ]; then cp -rf overlay/boards/. boards/; fi
+          if [ -d overlay/partitions ]; then mkdir -p partitions; cp -rn overlay/partitions/. partitions/; fi
+          if [ -d overlay/pio-tools ]; then mkdir -p pio-tools; cp -rn overlay/pio-tools/. pio-tools/;     
 
       - name: Speicher-C3 Anpassungen
         run: |
