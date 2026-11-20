@@ -2,6 +2,12 @@ name: Build Ottelo C3 TC (Speicher)
 
 on:
   workflow_dispatch:
+    inputs:
+      anpassungen:
+        description: 'Speicher-C3 Anpassungen einbauen (ZC-Dimmer, ohne SML)?'
+        required: true
+        default: true
+        type: boolean
 
 jobs:
   build:
@@ -37,6 +43,7 @@ jobs:
           done
 
       - name: Speicher-C3 Anpassungen
+        if: ${{ inputs.anpassungen }}
         run: |
           cat >> tasmota/user_config_override.h <<'EOF'
 
@@ -86,7 +93,15 @@ jobs:
           done
 
       - name: Image bauen
-        run: pio run -e "$UMGEBUNG"
+        run: |
+          set -o pipefail
+          pio run -e "$UMGEBUNG" 2>&1 | tee build.log
+
+      - name: Fehlerzeilen anzeigen
+        if: failure()
+        run: |
+          echo "--- Zeilen mit error: ---"
+          grep -n -B3 -A8 "error:" build.log | head -150 || true
 
       - name: Firmware suchen
         if: always()
