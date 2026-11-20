@@ -28,6 +28,8 @@ jobs:
         run: |
           echo "--- Inhalt von Ottelos Repo ---"
           ls -la overlay
+          echo "--- Ottelos Stand von Gemus Code ---"
+          cat "overlay/gemu2015 Repo Update.txt" || true
           cp -f overlay/tasmota/user_config_override.h tasmota/user_config_override.h
           shopt -s nullglob
           for f in overlay/*.ini overlay/*.py; do
@@ -60,6 +62,16 @@ jobs:
           #undef USE_HOME_ASSISTANT
           #undef USE_BMP
           EOF
+
+      - name: Wire1-Korrektur fuer den C3
+        run: |
+          F=tasmota/tasmota_xdrv_driver/xdrv_50_filesystem.ino
+          if grep -q "Wire1" "$F"; then
+            echo "Wire1 gefunden, ersetze durch Wire (C3 hat nur einen I2C-Bus)"
+            sed -i 's/\bWire1\b/Wire/g' "$F"
+          else
+            echo "Kein Wire1 in $F"
+          fi
 
       - name: Python einrichten
         uses: actions/setup-python@v5
