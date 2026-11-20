@@ -56,6 +56,11 @@ jobs:
           // ZCDimmerSet gehoert zum Licht-Treiber
           #undef USE_LIGHT
           #define USE_LIGHT
+          // DS18B20: Sensoren nach ID benennen, verlorene Sensoren neu suchen
+          #undef USE_DS18x20_RECONFIGURE
+          #define USE_DS18x20_RECONFIGURE
+          #undef DS18x20_USE_ID_AS_NAME
+          #define DS18x20_USE_ID_AS_NAME
           // nicht gebraucht
           #undef USE_SML_M
           #undef USE_SML_CRC
