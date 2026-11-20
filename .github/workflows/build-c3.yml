@@ -62,8 +62,15 @@ jobs:
       - name: PlatformIO installieren
         run: |
           pip install wheel
-          pip install -U https://github.com/platformio/platformio/archive/develop.zip || pip install -U --pre platformio
+          pip install "platformio==6.2.0" || pip install -U platformio
           pio --version
+
+      - name: Kernversion der Plattform festlegen
+        run: |
+          echo "pioarduino==6.2.0" > "$RUNNER_TEMP/constraints.txt"
+          echo "UV_CONSTRAINT=$RUNNER_TEMP/constraints.txt" >> "$GITHUB_ENV"
+          echo "PIP_CONSTRAINT=$RUNNER_TEMP/constraints.txt" >> "$GITHUB_ENV"
+          cat "$RUNNER_TEMP/constraints.txt"
 
       - name: Safeboot bauen
         run: |
