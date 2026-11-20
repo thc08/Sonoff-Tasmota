@@ -76,6 +76,15 @@ jobs:
             echo "Kein Wire1 in $F"
           fi
 
+      - name: Kamera-Bibliothek fuer den C3 entfernen
+        run: |
+          if [ -d lib/lib_div/esp32-camera ]; then
+            echo "Entferne lib/lib_div/esp32-camera (C3 ohne Kamera)"
+            rm -rf lib/lib_div/esp32-camera
+          else
+            echo "lib/lib_div/esp32-camera nicht vorhanden"
+          fi
+
       - name: Python einrichten
         uses: actions/setup-python@v5
         with:
