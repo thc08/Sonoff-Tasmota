@@ -57,11 +57,12 @@ jobs:
       - name: Python einrichten
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.12'
 
       - name: PlatformIO installieren
         run: |
-          pip install "platformio==6.2.0" || pip install "platformio>=6.2.1" || pip install -U --pre platformio
+          pip install wheel
+          pip install -U https://github.com/platformio/platformio/archive/develop.zip || pip install -U --pre platformio
           pio --version
 
       - name: Safeboot bauen
