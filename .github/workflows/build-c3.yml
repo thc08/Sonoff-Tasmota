@@ -30,17 +30,20 @@ jobs:
           ls -la overlay
           echo "--- Ottelos Stand von Gemus Code ---"
           cat "overlay/gemu2015 Repo Update.txt" || true
-          cp -f overlay/tasmota/user_config_override.h tasmota/user_config_override.h
+          echo "--- Dateien in Ottelos tasmota-Ordner ---"
+          find overlay/tasmota -type f | head -60
+          echo "--- Ordner in Ottelos lib-Ordner ---"
+          ls overlay/lib
           shopt -s nullglob
           for f in overlay/*.ini overlay/*.py; do
             echo "Kopiere $(basename "$f")"
             cp -f "$f" .
           done
-          for d in boards partitions pio-tools; do
+          for d in tasmota lib boards partitions pio-tools; do
             if [ -d "overlay/$d" ]; then
               echo "Kopiere Ordner $d"
               mkdir -p "$d"
-              cp -rn "overlay/$d/." "$d/"
+              cp -rf "overlay/$d/." "$d/"
             fi
           done
 
