@@ -4,9 +4,19 @@ on:
   workflow_dispatch:
     inputs:
       anpassungen:
-        description: 'Speicher-C3 Anpassungen einbauen (ZC-Dimmer, ohne SML)?'
+        description: 'Speicher-C3 Anpassungen einbauen (ZC-Dimmer, DS18B20, ohne SML)?'
         required: true
         default: true
+        type: boolean
+      mqttevent:
+        description: 'SUPPORT_MQTT_EVENT einschalten (MQTT-Empfang)?'
+        required: true
+        default: true
+        type: boolean
+      rules:
+        description: 'USE_RULES einschalten (nur fuer den Totmannschalter)?'
+        required: true
+        default: false
         type: boolean
 
 jobs:
@@ -69,6 +79,27 @@ jobs:
           #undef USE_INFLUXDB
           #undef USE_HOME_ASSISTANT
           #undef USE_BMP
+          EOF
+
+      - name: MQTT-Ereignisse einschalten
+        if: ${{ inputs.mqttevent }}
+        run: |
+          cat >> tasmota/user_config_override.h <<'EOF'
+
+          // MQTT-Abonnements: Empfang von Nachrichten
+          #ifndef SUPPORT_MQTT_EVENT
+          #define SUPPORT_MQTT_EVENT
+          #endif
+          EOF
+
+      - name: Regeln einschalten
+        if: ${{ inputs.rules }}
+        run: |
+          cat >> tasmota/user_config_override.h <<'EOF'
+
+          // Regeln (Ottelo schaltet sie sonst ab), fuer den Totmannschalter
+          #undef USE_RULES
+          #define USE_RULES
           EOF
 
       - name: Wire1-Korrektur fuer den C3
