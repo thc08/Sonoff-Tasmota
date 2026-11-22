@@ -57,6 +57,16 @@ jobs:
             fi
           done
 
+        - name: TinyC-Treiber pruefen
+        run: |
+          echo "--- Dateien mit dem MQTT-Teil von TinyC ---"
+          for f in $(grep -rl "tc_mqtt_subscribe" tasmota); do
+            echo "== $f"
+            grep -n "USE_MQTT" "$f" | head -5 || true
+          done
+          echo "--- Von Ottelos Ordnern geaenderte Dateien (TinyC) ---"
+          git status --short | grep -i "tinyc\|xdrv_124" || echo "keine"    
+
       - name: Speicher-C3 Anpassungen
         if: ${{ inputs.anpassungen }}
         run: |
