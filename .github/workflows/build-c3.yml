@@ -56,8 +56,8 @@ jobs:
               cp -rf "overlay/$d/." "$d/"
             fi
           done
-
-        - name: TinyC-Treiber pruefen
+          
+      - name: TinyC-Treiber pruefen
         run: |
           echo "--- Dateien mit dem MQTT-Teil von TinyC ---"
           for f in $(grep -rl "tc_mqtt_subscribe" tasmota); do
