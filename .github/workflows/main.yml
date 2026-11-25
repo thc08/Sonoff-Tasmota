@@ -9,11 +9,11 @@ on:
         default: 'SNB'
         type: string
         
-      mqtttls:
-        description: 'TLS komplett entfernen (MQTT-TLS und HTTPS)?'
+       mqtttls:
+        description: 'MQTT-TLS entfernen (nur wenn der Broker unverschluesselt ist)?'
         required: true
         default: true
-        type: boolean
+        type: boolean 
         
       mehr:
         description: 'Zusaetzlich DS18x20, DHT, BMP, Ping, Deepsleep entfernen?'
@@ -105,8 +105,7 @@ jobs:
 
           // TLS komplett aus: MQTT-TLS, HTTPS-Client und die TLS-Bibliothek
           #undef USE_MQTT_TLS
-          #undef USE_WEBCLIENT_HTTPS
-          #undef USE_TLS
+       
           EOF
 
       - name: Zusaetzliche Sensoren entfernen
