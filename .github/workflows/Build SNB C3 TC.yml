@@ -9,7 +9,7 @@ on:
         default: 'SNB'
         type: string
         
-       mqtttls:
+      mqtttls:
         description: 'MQTT-TLS entfernen (nur wenn der Broker unverschluesselt ist)?'
         required: true
         default: true
