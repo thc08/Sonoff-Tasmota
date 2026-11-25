@@ -1,0 +1,210 @@
+name: Build SNB C3 TC (Zaehler-Lesekopf)
+
+on:
+  workflow_dispatch:
+    inputs:
+      name:
+        description: 'Name im Image und in der Fusszeile (nur Buchstaben und Ziffern)'
+        required: true
+        default: 'SNB'
+        type: string
+        
+      mqtttls:
+        description: 'TLS komplett entfernen (MQTT-TLS und HTTPS)?'
+        required: true
+        default: true
+        type: boolean
+        
+      mehr:
+        description: 'Zusaetzlich DS18x20, DHT, BMP, Ping, Deepsleep entfernen?'
+        required: true
+        default: false
+        type: boolean
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      UMGEBUNG: tasmota32c3_ottelo_tc
+      NAME: ${{ inputs.name }}
+    steps:
+      - name: Fork holen
+        uses: actions/checkout@v4
+
+      - name: Ottelos Rezept holen
+        uses: actions/checkout@v4
+        with:
+          repository: ottelo9/tasmota-sml-images
+          path: overlay
+
+      - name: Rezept anwenden
+        run: |
+          echo "--- Inhalt von Ottelos Repo ---"
+          ls -la overlay
+          echo "--- Ottelos Stand von Gemus Code ---"
+          cat "overlay/gemu2015 Repo Update.txt" || true
+          shopt -s nullglob
+          for f in overlay/*.ini overlay/*.py; do
+            echo "Kopiere $(basename "$f")"
+            cp -f "$f" .
+          done
+          for d in tasmota lib boards partitions pio-tools; do
+            if [ -d "overlay/$d" ]; then
+              echo "Kopiere Ordner $d"
+              mkdir -p "$d"
+              cp -rf "overlay/$d/." "$d/"
+            fi
+          done
+
+      - name: Namen im Image setzen
+        run: |
+          echo "--- Fundstellen von ottelo.jimdofree.com ---"
+          grep -rn "ottelo.jimdofree.com" platformio_tasmota_cenv.ini tasmota lib 2>/dev/null | cut -c1-200 | head -20 || true
+          FILES=$(grep -rl "ottelo.jimdofree.com" platformio_tasmota_cenv.ini tasmota lib 2>/dev/null || true)
+          for f in $FILES; do
+            echo "Ersetze in $f"
+            sed -i "s/ottelo\.jimdofree\.com/${NAME}/g" "$f"
+          done
+          echo "--- danach: Fundstellen von $NAME in der Konfiguration ---"
+          grep -n "$NAME" platformio_tasmota_cenv.ini | cut -c1-200 | head -10 || true
+
+      - name: SNB-Profil (schlank)
+        run: |
+          cat >> tasmota/user_config_override.h <<'EOF'
+
+          // ---- SNB: Schlankes Zaehler-Profil (SML + Shelly-Emu + Charts) ----
+          #undef USE_BLE_ESP32
+          #undef USE_MI_ESP32
+          #undef USE_MATTER_DEVICE
+          #undef USE_WEBSERVER_TLS
+          #undef USE_HOME_ASSISTANT
+          #undef USE_MODBUS
+          #undef USE_MODBUS_BRIDGE
+          #undef USE_TCP_BRIDGE
+          #undef USE_FTP
+          #undef USE_DOMOTICZ
+          #undef USE_KNX
+          #undef USE_EMULATION_HUE
+          #undef USE_EMULATION_WEMO
+          #undef USE_SUNRISE
+          #undef USE_TIMERS
+          #undef USE_INFLUXDB
+          // mDNS/Discovery brauchen Ottelos Matter-Teil, deshalb die ganze Kette
+          #undef USE_MATTER_C_PLUGIN_ONLY
+          #undef USE_MATTER_C
+          #undef USE_BINPLUGINS
+          #undef WEBSERVER_ADVERTISE
+          #undef USE_DISCOVERY
+          #undef USE_MDNS
+          EOF
+          
+      - name: TLS entfernen
+        if: ${{ inputs.mqtttls }}
+        run: |
+          cat >> tasmota/user_config_override.h <<'EOF'
+
+          // TLS komplett aus: MQTT-TLS, HTTPS-Client und die TLS-Bibliothek
+          #undef USE_MQTT_TLS
+          #undef USE_WEBCLIENT_HTTPS
+          #undef USE_TLS
+          EOF
+
+      - name: Zusaetzliche Sensoren entfernen
+        if: ${{ inputs.mehr }}
+        run: |
+          cat >> tasmota/user_config_override.h <<'EOF'
+
+          // Zusatz: Sensoren, die ein Zaehler-Lesekopf nicht braucht
+          #undef USE_DS18x20
+          #undef USE_DHT
+          #undef USE_BMP
+          #undef USE_PING
+          #undef USE_DEEPSLEEP
+          EOF
+
+      - name: Wire1-Korrektur fuer den C3
+        run: |
+          F=tasmota/tasmota_xdrv_driver/xdrv_50_filesystem.ino
+          if grep -q "Wire1" "$F"; then
+            echo "Wire1 gefunden, ersetze durch Wire (C3 hat nur einen I2C-Bus)"
+            sed -i 's/\bWire1\b/Wire/g' "$F"
+          else
+            echo "Kein Wire1 in $F"
+          fi
+
+      - name: Kamera-Bibliothek fuer den C3 entfernen
+        run: |
+          if [ -d lib/lib_div/esp32-camera ]; then
+            echo "Entferne lib/lib_div/esp32-camera (C3 ohne Kamera)"
+            rm -rf lib/lib_div/esp32-camera
+          else
+            echo "lib/lib_div/esp32-camera nicht vorhanden"
+          fi
+
+      - name: Python einrichten
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: PlatformIO installieren
+        run: |
+          pip install wheel
+          pip install "platformio==6.2.0" || pip install -U platformio
+          pio --version
+
+      - name: Kernversion der Plattform festlegen
+        run: |
+          echo "pioarduino==6.2.0" > "$RUNNER_TEMP/constraints.txt"
+          echo "UV_CONSTRAINT=$RUNNER_TEMP/constraints.txt" >> "$GITHUB_ENV"
+          echo "PIP_CONSTRAINT=$RUNNER_TEMP/constraints.txt" >> "$GITHUB_ENV"
+          cat "$RUNNER_TEMP/constraints.txt"
+
+      - name: Safeboot bauen
+        run: |
+          pio run -e tasmota32c3-safeboot
+          echo "--- gefundene Safeboot-Dateien ---"
+          find . -name "*safeboot*.bin" -not -path "./.pio/libdeps/*" | head -50
+          mkdir -p build_output/firmware variants/tasmota
+          for f in build_output/firmware/tasmota32c3-safeboot.bin variants/tasmota/tasmota32c3-safeboot.bin; do
+            if [ -f "$f" ]; then
+              cp "$f" build_output/firmware/tasmota32c3_ottelo_tc-safeboot.bin
+              cp "$f" variants/tasmota/tasmota32c3_ottelo_tc-safeboot.bin
+            fi
+          done
+
+      - name: Image bauen
+        run: |
+          set -o pipefail
+          pio run -e "$UMGEBUNG" 2>&1 | tee build.log
+
+      - name: Fehlerzeilen anzeigen
+        if: failure()
+        run: |
+          echo "--- Zeilen mit error: ---"
+          grep -n -B3 -A8 "error:" build.log | head -150 || true
+
+      - name: Dateien mit snb im Namen
+        if: always()
+        run: |
+          mkdir -p snb_out
+          SRC=".pio/build/$UMGEBUNG/firmware.bin"
+          if [ -f "$SRC" ]; then
+            cp "$SRC" snb_out/tasmota32c3_snb_tc.bin
+          fi
+          ls -la snb_out || true
+          ls -la build_output/firmware || true
+
+      - name: Datum merken
+        if: always()
+        run: echo "DATUM=$(date +%Y-%m-%d_%H%M)" >> "$GITHUB_ENV"
+
+      - name: Ergebnis bereitstellen
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: snb-c3-tc-${{ env.DATUM }}
+          include-hidden-files: true
+          if-no-files-found: error
+          path: |
+            snb_out/
+            build_output/firmware/
