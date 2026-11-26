@@ -8,17 +8,20 @@ on:
         required: true
         default: 'SNB'
         type: string
-        
       mqtttls:
-        description: 'MQTT-TLS entfernen (nur wenn der Broker unverschluesselt ist)?'
+        description: 'MQTT-TLS entfernen (Broker unverschluesselt)?'
         required: true
         default: true
-        type: boolean 
-        
+        type: boolean
       mehr:
-        description: 'Zusaetzlich DS18x20, DHT, BMP, Ping, Deepsleep entfernen?'
+        description: 'DS18x20, DHT, BMP, Ping, Deepsleep entfernen?'
         required: true
-        default: false
+        default: true
+        type: boolean
+      noch_mehr:
+        description: 'Licht, Energie, I2C, Zaehler, ESP32-Sensoren entfernen?'
+        required: true
+        default: true
         type: boolean
 
 jobs:
@@ -97,28 +100,39 @@ jobs:
           #undef USE_DISCOVERY
           #undef USE_MDNS
           EOF
-          
-      - name: TLS entfernen
+
+      - name: MQTT-TLS entfernen
         if: ${{ inputs.mqtttls }}
         run: |
           cat >> tasmota/user_config_override.h <<'EOF'
 
-          // TLS komplett aus: MQTT-TLS, HTTPS-Client und die TLS-Bibliothek
           #undef USE_MQTT_TLS
-       
           EOF
 
-      - name: Zusaetzliche Sensoren entfernen
+      - name: Sensoren und Ping entfernen
         if: ${{ inputs.mehr }}
         run: |
           cat >> tasmota/user_config_override.h <<'EOF'
 
-          // Zusatz: Sensoren, die ein Zaehler-Lesekopf nicht braucht
+          // Zusatz: Sensoren und Ping, die ein Zaehler-Lesekopf nicht braucht
           #undef USE_DS18x20
           #undef USE_DHT
           #undef USE_BMP
           #undef USE_PING
           #undef USE_DEEPSLEEP
+          EOF
+
+      - name: Noch mehr entfernen
+        if: ${{ inputs.noch_mehr }}
+        run: |
+          cat >> tasmota/user_config_override.h <<'EOF'
+
+          // Zusatz 2: aus Status 4 abgeleitet (Treiber 3, 4, 68, I2C 7, Sensoren 1, 127)
+          #undef USE_LIGHT
+          #undef USE_ENERGY_SENSOR
+          #undef USE_I2C
+          #undef USE_COUNTER
+          #undef USE_ESP32_SENSORS
           EOF
 
       - name: Wire1-Korrektur fuer den C3
