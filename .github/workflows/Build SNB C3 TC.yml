@@ -134,16 +134,23 @@ jobs:
           #undef USE_COUNTER
           #undef USE_ESP32_SENSORS
           EOF
-
-      - name: Schalter-Fundstellen
+          
+      - name: Variantenblock in tasmota_configurations.h entschaerfen
+        env:
+          MEHR: ${{ inputs.mehr }}
+          NOCH: ${{ inputs.noch_mehr }}
         run: |
-          for m in USE_LIGHT USE_HOME_ASSISTANT USE_PING USE_COUNTER; do
-            echo "=== define $m ==="
-            grep -rn "define $m\b" tasmota 2>/dev/null | cut -c1-160 | head -8 || true
+          F=tasmota/include/tasmota_configurations.h
+          LIST="USE_HOME_ASSISTANT"
+          if [ "$MEHR" = "true" ]; then LIST="$LIST USE_PING"; fi
+          if [ "$NOCH" = "true" ]; then LIST="$LIST USE_LIGHT USE_COUNTER"; fi
+          echo "Zu entfernen: $LIST"
+          for m in $LIST; do
+            sed -i -E "s|^([[:space:]]*#[[:space:]]*define[[:space:]]+$m)([[:space:]].*)?$|// SNB entfernt: \1\2|" "$F"
           done
-          echo "=== Wo wird user_config_override.h eingebunden? ==="
-          grep -rn "user_config_override.h" tasmota/*.h tasmota/include 2>/dev/null | cut -c1-160 | head -8 || true
-
+          echo "--- danach noch aktive Zeilen in der Datei ---"
+          grep -n -E "^[[:space:]]*#[[:space:]]*define[[:space:]]+(USE_LIGHT|USE_COUNTER|USE_PING|USE_HOME_ASSISTANT)" "$F" || echo "keine"
+   
       - name: Wire1-Korrektur fuer den C3
         run: |
           F=tasmota/tasmota_xdrv_driver/xdrv_50_filesystem.ino
