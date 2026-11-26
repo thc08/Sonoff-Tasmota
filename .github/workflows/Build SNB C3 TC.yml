@@ -135,6 +135,15 @@ jobs:
           #undef USE_ESP32_SENSORS
           EOF
 
+      - name: Schalter-Fundstellen
+        run: |
+          for m in USE_LIGHT USE_HOME_ASSISTANT USE_PING USE_COUNTER; do
+            echo "=== define $m ==="
+            grep -rn "define $m\b" tasmota 2>/dev/null | cut -c1-160 | head -8 || true
+          done
+          echo "=== Wo wird user_config_override.h eingebunden? ==="
+          grep -rn "user_config_override.h" tasmota/*.h tasmota/include 2>/dev/null | cut -c1-160 | head -8 || true
+
       - name: Wire1-Korrektur fuer den C3
         run: |
           F=tasmota/tasmota_xdrv_driver/xdrv_50_filesystem.ino
