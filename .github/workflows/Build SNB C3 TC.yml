@@ -140,17 +140,33 @@ jobs:
           MEHR: ${{ inputs.mehr }}
           NOCH: ${{ inputs.noch_mehr }}
         run: |
-          F=tasmota/include/tasmota_configurations.h
+          F1=tasmota/include/tasmota_configurations.h
+          F2=tasmota/my_user_config.h
+          F68=tasmota/tasmota_xdrv_driver/xdrv_68_zerocrossDimmer.ino
+          ZC=$(grep -m1 -oE "USE_[A-Z0-9_]*ZERO[A-Z0-9_]*" "$F68" || true)
+          echo "Schalter des ZC-Dimmer-Treibers: ${ZC:-nicht gefunden}"
+          echo "--- erste Praeprozessor-Zeilen von xdrv_68 ---"
+          grep -n -E "^[[:space:]]*#[[:space:]]*(if|ifdef|ifndef)" "$F68" | head -6 || true
+          echo "--- weitere Dateien, die Light benutzen ---"
+          grep -rl "Light\." tasmota/tasmota_xdrv_driver tasmota/tasmota_xsns_sensor 2>/dev/null | head -10 || true
           LIST="USE_HOME_ASSISTANT"
           if [ "$MEHR" = "true" ]; then LIST="$LIST USE_PING"; fi
-          if [ "$NOCH" = "true" ]; then LIST="$LIST USE_LIGHT USE_COUNTER"; fi
+          if [ "$NOCH" = "true" ]; then
+            LIST="$LIST USE_COUNTER"
+            if [ -n "$ZC" ]; then
+              LIST="$LIST USE_LIGHT $ZC"
+              printf '\n#undef %s\n' "$ZC" >> tasmota/user_config_override.h
+            else
+              echo "ZC-Dimmer nicht abschaltbar: Licht bleibt im Image"
+            fi
+          fi
           echo "Zu entfernen: $LIST"
           for m in $LIST; do
-            sed -i -E "s|^([[:space:]]*#[[:space:]]*define[[:space:]]+$m)([[:space:]].*)?$|// SNB entfernt: \1\2|" "$F"
+            sed -i -E "s|^([[:space:]]*#[[:space:]]*define[[:space:]]+$m)([[:space:]].*)?$|// SNB entfernt: \1\2|" "$F1" "$F2"
           done
-          echo "--- danach noch aktive Zeilen in der Datei ---"
-          grep -n -E "^[[:space:]]*#[[:space:]]*define[[:space:]]+(USE_LIGHT|USE_COUNTER|USE_PING|USE_HOME_ASSISTANT)" "$F" || echo "keine"
-   
+          echo "--- danach noch aktive Zeilen ---"
+          grep -n -E "^[[:space:]]*#[[:space:]]*define[[:space:]]+(USE_LIGHT|USE_COUNTER|USE_PING|USE_HOME_ASSISTANT)" "$F1" "$F2" || echo "keine"
+    
       - name: Wire1-Korrektur fuer den C3
         run: |
           F=tasmota/tasmota_xdrv_driver/xdrv_50_filesystem.ino
