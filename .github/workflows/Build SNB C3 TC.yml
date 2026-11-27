@@ -183,9 +183,20 @@ jobs:
             echo "Entferne lib/lib_div/esp32-camera (C3 ohne Kamera)"
             rm -rf lib/lib_div/esp32-camera
           else
-            echo "lib/lib_div/esp32-camera nicht vorhanden"
+            echo "lib/lib_div/esp32-camera nicht vorhanden"  
           fi
-
+          
+      - name: Treiber 10, 12 und 62 benennen
+        run: |
+          for n in 10 12 62; do
+            echo "=== XDRV_$n ==="
+            grep -rn "define XDRV_$n\b" tasmota 2>/dev/null | cut -c1-160 | head -5 || true
+          done
+          for m in USE_DISCOVERY USE_MDNS USE_RULES USE_SCRIPT USE_BLE_ESP32 USE_MI_ESP32; do
+            echo "=== define $m ==="
+            grep -rn "define $m\b" tasmota/my_user_config.h tasmota/include/tasmota_configurations.h tasmota/user_config_override.h 2>/dev/null | cut -c1-160 | head -6 || true
+          done
+          
       - name: Python einrichten
         uses: actions/setup-python@v5
         with:
